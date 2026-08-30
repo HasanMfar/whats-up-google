@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parent.parent
 console = Console()
 
 DEFAULT_CONFIG = {
-    "concurrency": 50,
+    "concurrency": 20,
     "timeout_seconds": 10,
     "retries": 1,
     "socks_port_start": 10810,
@@ -33,6 +33,11 @@ DEFAULT_CONFIG = {
 
 
 def load_config() -> dict:
+    """Defaults <- config.json <- CLI flags, in that order.
+
+    The shipped config.json is (re)written once with the defaults; afterwards it is
+    never touched again, so user edits always stick.
+    """
     cfg = dict(DEFAULT_CONFIG)
     cfg["checks"] = dict(DEFAULT_CONFIG["checks"])
     cfg_path = ROOT / "config.json"
