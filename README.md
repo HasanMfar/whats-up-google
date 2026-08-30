@@ -37,16 +37,33 @@ Verdicts: `CLEAN` = passed everything - `FLAGGED` = Google blocks it (captcha / 
 ```bash
 python -m scanner                  # full scan
 python -m scanner --dry-run        # just list parsed configs + IDs
-python -m scanner --concurrency 16 # test 16 nodes in parallel (default 8)
+python -m scanner --concurrency 40 # test 40 nodes in parallel (default 20)
 python -m scanner --skip search    # drop a check: search/gemini/gemini_api/antigravity
 python -m scanner --watch 30       # re-scan every 30 minutes
 python -m scanner --file links.txt # local file of links instead of subscriptions.txt
 ```
 
+## After each run
+
+- The tool **prints every file it wrote** - JSON/CSV reports plus each hand-picked
+  subscription tier - with its path and size.
+- A subscription URL that returns no V2Ray links (an HTML page, a code list, ...)
+  **fails loudly** with a 150-char preview of what it actually returned, instead of
+  being silently skipped.
+- Settings live in `config.json` (concurrency, timeout, per-check toggles). It is
+  created once with defaults and **never overwritten** afterwards - precedence:
+  defaults <- `config.json` <- CLI flags.
+
 ## Troubleshooting
 
 - **Xray download fails** (GitHub blocked): set `HTTPS_PROXY`, or put the path to your
   own `xray.exe` in `xray_path` inside `config.json` (e.g. the one in your v2rayN folder).
+- **"SOCKS port is already in use"**: leftover xray.exe processes from an interrupted
+  scan are still running - close them in Task Manager, or change `socks_port_start`
+  in `config.json`.
+- **"subscription did not return V2Ray links"**: that URL is not a V2Ray subscription
+  (a page, a code list, another client's export) - fix the URL; the error shows a
+  150-char preview of what it returned.
 - **How blocking is detected**: Search → `/sorry` captcha page - Gemini web → 403 /
   country page - Gemini API → "User location is not supported" - Antigravity → 403/429
   or block page.
