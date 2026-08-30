@@ -1,0 +1,5 @@
+# Paste your V2Ray subscription URLs below, one per line.
+# Lines starting with # are ignored.
+# Example: https://example.com/api/v1/client/subscribe?token=xxxx
+#
+# Copy this file to subscriptions.txt (which is gitignored) and put your real URLs there.

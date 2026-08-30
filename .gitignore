@@ -1,0 +1,18 @@
+# private data - never publish
+subscriptions.txt
+*_subscription.txt
+*_links.txt
+reports/
+
+# runtime / downloaded binaries
+bin/
+*.tmp
+
+# python
+__pycache__/
+*.pyc
+.venv/
+
+# editor/tool folders
+.mimocode/
+.freebuff/

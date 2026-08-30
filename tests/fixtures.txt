@@ -1,0 +1,5 @@
+vmess://eyJ2IjoiMiIsInBzIjoiSEsgVk1lc3MiLCJhZGQiOiJoay5leGFtcGxlLmNvbSIsInBvcnQiOiI0NDMiLCJpZCI6ImI4MzEzODFkLTYzMjQtNGQ1My1hZDRmLThjZGE0OGIzMDgxMSIsImFpZCI6IjAiLCJzY3kiOiJhdXRvIiwibmV0Ijoid3MiLCJ0eXBlIjoibm9uZSIsImhvc3QiOiJjZG4uZXhhbXBsZS5jb20iLCJwYXRoIjoiL3Ztd3MiLCJ0bHMiOiJ0bHMiLCJzbmkiOiJoay5leGFtcGxlLmNvbSJ9
+vless://b831381d-6324-4d53-ad4f-8cda48b30811@us.example.com:443?encryption=none&security=reality&sni=www.google.com&fp=chrome&pbk=PUBKEY123&sid=ab12&type=grpc&serviceName=grpcsvc&flow=xtls-rprx-vision#US%20Reality
+trojan://p%40ssw0rd@jp.example.com:8443?security=tls&sni=jp.example.com&type=tcp#JP%20Trojan
+ss://YWVzLTI1Ni1nY206cHcxMjM0NQ==@1.2.3.4:8388#SS%20Node
+ss://YWVzLTI1Ni1nY206cHcxMjM0NUA1LjYuNy44Ojk5MA==#legacy

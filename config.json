@@ -1,0 +1,13 @@
+{
+  "concurrency": 8,
+  "timeout_seconds": 10,
+  "retries": 1,
+  "socks_port_start": 10810,
+  "xray_path": "",
+  "checks": {
+    "search": true,
+    "gemini": true,
+    "gemini_api": true,
+    "antigravity": true
+  }
+}
