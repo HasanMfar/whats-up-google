@@ -1,6 +1,6 @@
 # What's up google - Google Access Scanner for V2Ray Subscriptions
 
-> راهنمای فارسی پایین همین فایل است.
+> 🇮🇷 Full Persian docs: [README.fa.md](README.fa.md)
 
 Checks your V2Ray subscription **config by config** and picks out the clean ones: for
 each node it sends real requests through that node and sees whether Google lets it
@@ -51,48 +51,10 @@ python -m scanner --file links.txt # local file of links instead of subscription
 
 ---
 
-## راهنمای فارسی
+## راهنمای فارسی (خلاصه)
 
-ابزار اشتراک وی‌۲ری شما را **کانفیگ به کانفیگ** بررسی می‌کند و کانفیگ‌های تمیز را جدا
-می‌کند: برای هر نود، درخواست‌های واقعی از طریق خودِ همان نود فرستاده می‌شود تا معلوم شود
-گوگل اجازهٔ دسترسی به جستجو، جمینای (وب)، جمینای API و آنتی‌گرَویتی را می‌دهد یا پرچم/مسدودش می‌کند.
+ابزار اشتراک وی‌۲ری شما را **کانفیگ به کانفیگ** بررسی می‌کند و کانفیگ‌های تمیز را برای
+جمینای و آنتی‌گرَویتی جدا می‌کند: روی **`run.bat`** دوبار کلیک کنید، آدرس اشتراک‌ها را در
+`subscriptions.txt` بگذارید، و بعد از اسکن، `best_subscription.txt` را در v2rayN ایمپورت کنید.
 
-### شروع سریع (ویندوز)
-
-۱. روی **`run.bat`** دوبار کلیک کنید.
-   - فقط بار اول: پکیج‌های پایتون نصب و هستهٔ Xray دانلود می‌شود.
-   - `subscriptions.txt` در نوت‌پد باز می‌شود - آدرس اشتراک‌ها را بگذارید (هر خط یک
-     آدرس)، ذخیره و ببندید. اسکن خودش شروع می‌شود.
-۲. جدول زنده را ببینید: هر کانفیگ با **آیدی**، سرور، کشور خروجی، تأخیر و نتیجهٔ هر بررسی.
-۳. بعد از پایان، در v2rayN ایمپورت کنید:
-
-| فایل | محتوا |
-|------|-------|
-| `best_subscription.txt` | **از اینجا شروع کنید** - سریع‌ترین کانفیگ به‌ازای هر IP سالم، برای جمینای/آنتی‌گرَویتی |
-| `clean_subscription.txt` | همهٔ بررسی‌ها را پاس کرده |
-| `gemini_subscription.txt` | برای جمینای (وب + API) قابل‌استفاده - حتی اگر جستجو کپچا بدهد |
-| `antigravity_subscription.txt` | برای آنتی‌گرَویتی قابل‌استفاده |
-
-هر فایل base64 است و مستقیم قابل ایمپورت است. `*_links.txt` همان نودها به‌صورت لینک خام
-است. جزئیات کامل (IP خروجی، ISP/ASN، وضعیت هر بررسی) در `reports/scan-<زمان>.json` و `.csv`.
-
-نتیجه‌ها: `CLEAN` = همه‌چیز پاس - `FLAGGED` = گوگل مسدودش کرده (کپچا / منطقه / خطای
-موقعیت) - `DEAD` = هیچ‌چیز رد نمی‌شود - `ERROR` = دوباره اجرا کنید.
-
-### از ترمینال
-
-```bash
-python -m scanner                  # اسکن کامل
-python -m scanner --dry-run        # فقط لیست کانفیگ‌ها و آیدی‌ها
-python -m scanner --concurrency 16 # تست همزمان ۱۶ نود (پیش‌فرض ۸)
-python -m scanner --skip search    # حذف یک بررسی: search/gemini/gemini_api/antigravity
-python -m scanner --watch 30       # تکرار اسکن هر ۳۰ دقیقه
-python -m scanner --file links.txt # فایل محلی لینک‌ها به‌جای subscriptions.txt
-```
-
-### مشکلات رایج
-
-- **دانلود Xray ناموفق** (گیت‌هاب فیلتر است): `HTTPS_PROXY` را ست کنید، یا در
-  `config.json` مسیر `xray.exe` خودتان (مثلاً از پوشه v2rayN) را در `xray_path` بگذارید.
-- **نحوهٔ تشخیص مسدودی**: جستجو → صفحهٔ کپچای `/sorry` - جمینای وب → ۴۰۳ / صفحهٔ کشور -
-  جمینای API → خطای «User location is not supported» - آنتی‌گرَویتی → ۴۰۳/۴۲۹ یا صفحهٔ مسدودی.
+➡️ **مستندات کامل فارسی: [README.fa.md](README.fa.md)**
