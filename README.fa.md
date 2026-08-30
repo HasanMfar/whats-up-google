@@ -1,6 +1,7 @@
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/downloads/)
 [![Windows](https://img.shields.io/badge/platform-Windows-lightgrey)](#)
 [![Xray-core](https://img.shields.io/badge/core-Xray-red)](https://github.com/XTLS/Xray-core)
+![Written with ZCode](https://img.shields.io/badge/written%20with-ZCode-8A2BE2)
 
 <div dir="rtl">
 
@@ -87,5 +88,9 @@ scanner/
 ## نکته
 
 این ابزار فقط برای بررسی اشتراک‌های خودتان است و کاری با دورزدن سیستم‌های تشخیص ندارد — صرفاً وضعیت هر کانفیگ را همان‌طور که گوگل پاسخ می‌دهد ثبت می‌کند.
+
+## سلب مسئولیت
+
+این پروژه با کمک **ZCode** (دستیار کدنویسی مبتنی بر هوش مصنوعی) نوشته شده است و «همان‌گونه که هست» ارائه می‌شود — بدون هیچ‌گونه ضمانت. پیش از استفاده، کد را مرور کنید.
 
 </div>

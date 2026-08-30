@@ -1,5 +1,7 @@
 # What's up google - Google Access Scanner for V2Ray Subscriptions
 
+![Written with ZCode](https://img.shields.io/badge/written%20with-ZCode-8A2BE2)
+
 > 🇮🇷 Full Persian docs: [README.fa.md](README.fa.md)
 
 Checks your V2Ray subscription **config by config** and picks out the clean ones: for
@@ -58,3 +60,9 @@ python -m scanner --file links.txt # local file of links instead of subscription
 `subscriptions.txt` بگذارید، و بعد از اسکن، `best_subscription.txt` را در v2rayN ایمپورت کنید.
 
 ➡️ **مستندات کامل فارسی: [README.fa.md](README.fa.md)**
+
+## Disclaimer
+
+This project was written with **ZCode**, an AI coding agent. It is provided as-is,
+without any warranty of any kind - review the code before using it with anything
+sensitive.
