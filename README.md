@@ -53,8 +53,14 @@ Each file is a base64 subscription - import it directly. `*_links.txt` holds the
 nodes as raw links. Full details (exit IP, ISP/ASN, per-check status) are in
 `reports/scan-<timestamp>.json` / `.csv`.
 
-Verdicts: `CLEAN` = passed everything - `FLAGGED` = Google blocks it (captcha / region
-/ location error) - `DEAD` = nothing gets through - `ERROR` = rerun to confirm.
+## Verdicts
+
+| Verdict | Meaning |
+|---------|---------|
+| `CLEAN` ✅ | Passed every check - Google doesn't flag this node |
+| `FLAGGED` ⛔ | At least one check hit a block (captcha / region / location error) |
+| `DEAD` 💀 | No HTTP response got through the node at all |
+| `ERROR` ⚠️ | Node responded but a probe errored - rerun to confirm |
 
 ## From the terminal instead
 
@@ -88,9 +94,28 @@ python -m scanner --file links.txt # local file of links instead of subscription
 - **"subscription did not return V2Ray links"**: that URL is not a V2Ray subscription
   (a page, a code list, another client's export) - fix the URL; the error shows a
   150-char preview of what it returned.
-- **How blocking is detected**: Search → `/sorry` captcha page - Gemini web → 403 /
-  country page - Gemini API → "User location is not supported" - Antigravity → 403/429
-  or block page.
+
+## How blocking is detected
+
+| Check | Flagged when |
+|-------|--------------|
+| Google Search | Redirected to the `/sorry` captcha page or unusual-traffic markers |
+| Gemini web | 403, the country-block page, or `/unsupported` |
+| Gemini API | `"User location is not supported for the API use"` - any other API error means the location is accepted |
+| Antigravity | 403/429 or a block page |
+
+## Project structure
+
+```
+scanner/
+├── nodes.py           # parse vmess / vless / trojan / ss links, extract node IDs
+├── subscriptions.py   # fetch + decode subscriptions (base64 and raw link lists)
+├── xray.py            # auto-download the Xray core, one process per node
+├── probes.py          # the four Google checks, run in parallel over SOCKS
+├── clean_sub.py       # hand-pick clean configs into importable subscriptions
+├── report.py          # live table + JSON/CSV reports
+└── main.py            # CLI entry point and scan orchestration
+```
 
 ---
 
