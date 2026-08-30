@@ -66,3 +66,9 @@ python -m scanner --file links.txt # local file of links instead of subscription
 This project was written with **ZCode**, an AI coding agent. It is provided as-is,
 without any warranty of any kind - review the code before using it with anything
 sensitive.
+
+The tool is intended solely for personal use by users affected by the restrictions
+Google applies to them (region blocks, captchas, location errors): it checks how those
+restrictions affect the user's own subscription configs. **This code itself is not a
+VPN or circumvention ("filter-breaker") tool** - it provides no proxy of its own and
+only tests configs the user already has.
