@@ -16,14 +16,14 @@ from . import __version__, xray as xray_mod
 from .clean_sub import print_summary, write_clean_outputs
 from .nodes import Node, dedupe, parse_links
 from .probes import run_all_probes, verdict_from, node_latency_ms
-from .report import CHECKS, build_table, summarize, write_reports
+from .report import CHECKS, build_table, print_output_files, summarize, write_reports
 from .subscriptions import fetch_subscription, load_subscription_urls, make_client
 
 ROOT = Path(__file__).resolve().parent.parent
 console = Console()
 
 DEFAULT_CONFIG = {
-    "concurrency": 8,
+    "concurrency": 50,
     "timeout_seconds": 10,
     "retries": 1,
     "socks_port_start": 10810,
@@ -89,7 +89,10 @@ def gather_nodes(args) -> tuple[list[Node], dict]:
                 text = fetch_subscription(client, url)
             except Exception as e:  # noqa: BLE001
                 stats["fetch_errors"] += 1
-                console.print(f"[red]fetch failed:[/red] {type(e).__name__}: {e}")
+                console.print(f"[red]subscription failed:[/red] {type(e).__name__}: {e}")
+                if "did not return V2Ray links" in str(e):
+                    console.print("[yellow]  ^ check that this URL is a V2Ray subscription "
+                                  "link, not a page or a code list.[/yellow]")
                 continue
             parsed, errors = parse_links(text, source=url)
             nodes.extend(parsed)
@@ -229,9 +232,8 @@ def main(argv=None):
             "sources": stats["sources"], "checks_enabled": enabled,
         })
         outputs = write_clean_outputs(ROOT, rows)
-        console.print(f"Reports: {json_path}")
-        console.print(f"         {csv_path}")
         print_summary(console, rows, outputs)
+        print_output_files(console, [json_path, csv_path, *outputs.values()])
         return rows
 
     if args.watch:

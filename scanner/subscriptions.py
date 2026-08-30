@@ -28,7 +28,7 @@ def b64_decode_tolerant(text: str) -> str:
     return base64.b64decode(data).decode("utf-8", "replace")
 
 
-def decode_subscription(text: str) -> str:
+def decode_subscription(text: str, source: str = "") -> str:
     t = text.strip()
     if _looks_like_links(t):
         return t
@@ -38,7 +38,12 @@ def decode_subscription(text: str) -> str:
             return decoded
     except Exception:
         pass
-    return t  # let the link parser report the errors
+    preview = t[:150].replace("\n", " ")
+    raise ValueError(
+        f"subscription did not return V2Ray links (no vmess/vless/trojan/ss found)"
+        + (f" [{source}]" if source else "")
+        + f" - first 150 chars: {preview!r}"
+    )
 
 
 def fetch_subscription(client: httpx.Client, url: str) -> str:
@@ -47,7 +52,7 @@ def fetch_subscription(client: httpx.Client, url: str) -> str:
     text = r.text
     if "proxies:" in text and "cipher:" in text:
         raise ValueError("looks like a Clash YAML subscription - this scanner supports V2Ray/Xray subs only")
-    return decode_subscription(text)
+    return decode_subscription(text, source=url)
 
 
 def make_client() -> httpx.Client:

@@ -71,6 +71,14 @@ def summarize(rows: list[dict]) -> dict:
     return counts
 
 
+def print_output_files(console, paths) -> None:
+    """List every file the run produced, with its size."""
+    console.print()
+    console.print("[bold]Output files:[/bold]")
+    for p in paths:
+        console.print(f"  {p}  [dim]({p.stat().st_size / 1024:.1f} KB)[/dim]")
+
+
 def write_reports(root: Path, rows: list[dict], extra_meta: dict | None = None) -> tuple[Path, Path]:
     reports_dir = root / "reports"
     reports_dir.mkdir(exist_ok=True)

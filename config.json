@@ -1,5 +1,5 @@
 {
-  "concurrency": 8,
+  "concurrency": 100,
   "timeout_seconds": 10,
   "retries": 1,
   "socks_port_start": 10810,
