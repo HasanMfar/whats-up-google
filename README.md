@@ -1,6 +1,8 @@
 # What's up google - Google Access Scanner for V2Ray Subscriptions
 
 ![Written with ZCode](https://img.shields.io/badge/written%20with-ZCode-8A2BE2)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![tests](https://github.com/HasanMfar/whats-up-google/actions/workflows/tests.yml/badge.svg)](https://github.com/HasanMfar/whats-up-google/actions/workflows/tests.yml)
 
 > 🇮🇷 Full Persian docs: [README.fa.md](README.fa.md)
 

@@ -2,6 +2,8 @@
 [![Windows](https://img.shields.io/badge/platform-Windows-lightgrey)](#)
 [![Xray-core](https://img.shields.io/badge/core-Xray-red)](https://github.com/XTLS/Xray-core)
 ![Written with ZCode](https://img.shields.io/badge/written%20with-ZCode-8A2BE2)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![tests](https://github.com/HasanMfar/whats-up-google/actions/workflows/tests.yml/badge.svg)](https://github.com/HasanMfar/whats-up-google/actions/workflows/tests.yml)
 
 <div dir="rtl">
 
