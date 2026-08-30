@@ -10,6 +10,28 @@ Checks your V2Ray subscription **config by config** and picks out the clean ones
 each node it sends real requests through that node and sees whether Google lets it
 through to Google Search, Gemini (web), the Gemini API and Antigravity - or flags/blocks it.
 
+## About this project
+
+V2Ray subscriptions bundle dozens of configs, and Google treats each **exit IP**
+differently: some IPs get captchas on Search, some are region-blocked on Gemini,
+some hit the Gemini API "location not supported" error, some are fine. The
+subscription as a whole is therefore never uniformly usable - but individual
+configs among them are.
+
+This tool answers exactly two questions:
+
+1. **Which of my configs does Google let through, and to which services?** - every
+   config is tested through its own tunnel, with its ID recorded, so results are
+   attributable per config.
+2. **Which file should I import so it just works?** - the scanner hand-picks the
+   passing configs into importable subscription tiers (`best`, `clean`, `gemini`,
+   `antigravity`) instead of leaving you to eyeball a table.
+
+It is a **diagnostic and picking tool**, not a proxy: all requests go through the
+configs you already have. Testing runs locally - a temporary Xray process per node,
+parallel probes for speed (20 nodes at a time by default), and full JSON/CSV
+evidence behind every verdict.
+
 ## Quick start (Windows)
 
 1. Double-click **`run.bat`**.
