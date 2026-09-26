@@ -30,10 +30,14 @@ def b64_decode_tolerant(text: str) -> str:
 
 def decode_subscription(text: str, source: str = "") -> str:
     t = text.strip()
-    if _looks_like_links(t):
-        return t
+    # Strip comments that can break link detection or base64 decoding
+    lines = [line for line in text.splitlines() if not line.lstrip().startswith("#")]
+    t_no_comments = "\n".join(lines).strip()
+
+    if _looks_like_links(t_no_comments):
+        return t_no_comments
     try:
-        decoded = b64_decode_tolerant(t)
+        decoded = b64_decode_tolerant(t_no_comments)
         if _looks_like_links(decoded):
             return decoded
     except Exception:

@@ -151,6 +151,7 @@ def run_scan(nodes: list[Node], cfg: dict, live_title: str) -> list[dict]:
     rows: list[dict] = []
     ports = [cfg["socks_port_start"] + i for i in range(len(nodes))]
     futures = {}
+    last_save = time.time()
     with Live(build_table(rows, live_title), console=console, refresh_per_second=2) as live:
         with ThreadPoolExecutor(max_workers=cfg["concurrency"]) as pool:
             try:
@@ -166,6 +167,11 @@ def run_scan(nodes: list[Node], cfg: dict, live_title: str) -> list[dict]:
                                      "tested_at": datetime.now().isoformat(timespec="seconds")})
                     rows.sort(key=lambda r: (r["node"].server, r["node"].port))
                     s = summarize(rows)
+                    
+                    if time.time() - last_save > 5.0:
+                        write_clean_outputs(ROOT, rows)
+                        last_save = time.time()
+                        
                     live.update(build_table(
                         rows,
                         f"{live_title}   [dim]done {s['CLEAN']+s['FLAGGED']+s['DEAD']+s['ERROR']}/{s['TOTAL']}"
@@ -175,6 +181,7 @@ def run_scan(nodes: list[Node], cfg: dict, live_title: str) -> list[dict]:
                 pool.shutdown(wait=False, cancel_futures=True)
                 for inst in list(xray_mod.active_instances):
                     inst.stop()
+                write_clean_outputs(ROOT, rows)
                 raise
     return rows
 
