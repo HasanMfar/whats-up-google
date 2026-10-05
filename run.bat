@@ -21,7 +21,8 @@ findstr /b /c:"http" subscriptions.txt >nul 2>nul || (
 )
 
 echo.
-echo Starting scan... this tests every config one by one, please wait.
+echo A menu will appear - choose 1 (Full scan) to test every config.
+echo Press Ctrl+C at any time to stop; xray is closed along with the scanner.
 echo.
 python -m scanner
 

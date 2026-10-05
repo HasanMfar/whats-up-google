@@ -30,5 +30,17 @@ jobs:
       - name: Hand-picking tests
         run: python tests/test_clean.py
 
+      - name: Subscription decoding tests
+        run: python tests/test_subscriptions.py
+
+      - name: Xray lifecycle tests
+        run: python tests/test_xray_lifecycle.py
+
+      - name: Kill-on-exit tests
+        run: python tests/test_kill_on_exit.py
+
+      - name: Menu tests
+        run: python tests/test_menu.py
+
       - name: Modules parse + CLI smoke test
         run: python -c "import ast,pathlib; [ast.parse(p.read_text(encoding='utf-8')) for p in pathlib.Path('scanner').glob('*.py')]" && python -m scanner --version

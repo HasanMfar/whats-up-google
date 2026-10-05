@@ -14,6 +14,7 @@ from rich.live import Live
 
 from . import __version__, xray as xray_mod
 from .clean_sub import print_summary, write_clean_outputs
+from .menu import show_menu
 from .nodes import Node, dedupe, parse_links
 from .probes import run_all_probes, verdict_from, node_latency_ms
 from .report import CHECKS, build_table, print_output_files, summarize, write_reports
@@ -121,74 +122,91 @@ def test_node(node: Node, exe: Path, socks_port: int, cfg: dict) -> dict:
     }
     inst = xray_mod.XrayInstance(exe, node, socks_port, ROOT)
     try:
-        inst.start()
-    except Exception as e:  # noqa: BLE001
-        row["verdict"] = "DEAD"
-        row["error"] = f"xray: {e}"
-        row["tested_at"] = datetime.now().isoformat(timespec="seconds")
+        try:
+            inst.start()
+        except Exception as e:  # noqa: BLE001
+            row["verdict"] = "DEAD"
+            row["error"] = f"xray: {e}"
+            return row
+        try:
+            results, exit_ip, alive = run_all_probes(
+                socks_port, cfg["checks"], cfg["timeout_seconds"], cfg["retries"])
+            row["results"] = results
+            row["exit_ip"] = exit_ip
+            row["alive"] = alive
+            row["latency_ms"] = node_latency_ms(results)
+            row["verdict"] = verdict_from(results, alive)
+            if not alive:
+                row["error"] = "no probe got an HTTP response through this node"
+        except Exception as e:  # noqa: BLE001
+            row["verdict"] = "ERROR"
+            row["error"] = f"{type(e).__name__}: {e}"
         return row
-    try:
-        results, exit_ip, alive = run_all_probes(
-            socks_port, cfg["checks"], cfg["timeout_seconds"], cfg["retries"])
-        row["results"] = results
-        row["exit_ip"] = exit_ip
-        row["alive"] = alive
-        row["latency_ms"] = node_latency_ms(results)
-        row["verdict"] = verdict_from(results, alive)
-        if not alive:
-            row["error"] = "no probe got an HTTP response through this node"
-    except Exception as e:  # noqa: BLE001
-        row["verdict"] = "ERROR"
-        row["error"] = f"{type(e).__name__}: {e}"
     finally:
+        # One outer finally for every path (start failure, probe failure,
+        # unexpected exceptions): the instance can never outlive this test.
+        if not row["tested_at"]:
+            row["tested_at"] = datetime.now().isoformat(timespec="seconds")
         inst.stop()
-    row["tested_at"] = datetime.now().isoformat(timespec="seconds")
-    return row
 
 
 def run_scan(nodes: list[Node], cfg: dict, live_title: str) -> list[dict]:
+    # Sweep up leftovers from earlier/interrupted runs before we bind ports.
+    xray_mod.stop_all()
+    xray_mod.kill_orphans(ROOT)
     exe = xray_mod.ensure_xray(ROOT, cfg.get("xray_path", ""))
     rows: list[dict] = []
     ports = [cfg["socks_port_start"] + i for i in range(len(nodes))]
     futures = {}
     last_save = time.time()
-    with Live(build_table(rows, live_title), console=console, refresh_per_second=2) as live:
-        with ThreadPoolExecutor(max_workers=cfg["concurrency"]) as pool:
-            try:
-                for node, port in zip(nodes, ports):
-                    futures[pool.submit(test_node, node, exe, port, cfg)] = node
-                for fut in as_completed(futures):
+    try:
+        with Live(build_table(rows, live_title), console=console, refresh_per_second=2) as live:
+            with ThreadPoolExecutor(max_workers=cfg["concurrency"]) as pool:
+                try:
+                    for node, port in zip(nodes, ports):
+                        futures[pool.submit(test_node, node, exe, port, cfg)] = node
+                    for fut in as_completed(futures):
+                        try:
+                            rows.append(fut.result())
+                        except Exception as e:  # noqa: BLE001
+                            n = futures[fut]
+                            rows.append({"node": n, "results": {}, "exit_ip": {}, "latency_ms": None,
+                                         "verdict": "ERROR", "error": f"{type(e).__name__}: {e}",
+                                         "tested_at": datetime.now().isoformat(timespec="seconds")})
+                        rows.sort(key=lambda r: (r["node"].server, r["node"].port))
+                        s = summarize(rows)
+
+                        if time.time() - last_save > 5.0:
+                            write_clean_outputs(ROOT, rows)
+                            last_save = time.time()
+
+                        live.update(build_table(
+                            rows,
+                            f"{live_title}   [dim]done {s['CLEAN']+s['FLAGGED']+s['DEAD']+s['ERROR']}/{s['TOTAL']}"
+                            f" - clean {s['CLEAN']} - flagged {s['FLAGGED']} - dead {s['DEAD']}[/dim]"))
+                except KeyboardInterrupt:
+                    console.print("\n[yellow]Interrupted - stopping xray processes...[/yellow]")
+                    pool.shutdown(wait=False, cancel_futures=True)  # drop queued tests
+                    xray_mod.stop_all()          # kill running xray, abort in-flight starts
                     try:
-                        rows.append(fut.result())
-                    except Exception as e:  # noqa: BLE001
-                        n = futures[fut]
-                        rows.append({"node": n, "results": {}, "exit_ip": {}, "latency_ms": None,
-                                     "verdict": "ERROR", "error": f"{type(e).__name__}: {e}",
-                                     "tested_at": datetime.now().isoformat(timespec="seconds")})
-                    rows.sort(key=lambda r: (r["node"].server, r["node"].port))
-                    s = summarize(rows)
-                    
-                    if time.time() - last_save > 5.0:
-                        write_clean_outputs(ROOT, rows)
-                        last_save = time.time()
-                        
-                    live.update(build_table(
-                        rows,
-                        f"{live_title}   [dim]done {s['CLEAN']+s['FLAGGED']+s['DEAD']+s['ERROR']}/{s['TOTAL']}"
-                        f" - clean {s['CLEAN']} - flagged {s['FLAGGED']} - dead {s['DEAD']}[/dim]"))
-            except KeyboardInterrupt:
-                console.print("\n[yellow]Interrupted - stopping xray processes...[/yellow]")
-                pool.shutdown(wait=False, cancel_futures=True)
-                for inst in list(xray_mod.active_instances):
-                    inst.stop()
-                write_clean_outputs(ROOT, rows)
-                raise
+                        pool.shutdown(wait=True)  # let workers unwind (fast once xray is dead)
+                    except KeyboardInterrupt:
+                        pass  # a second Ctrl+C must not abort cleanup
+                    raise
+    finally:
+        # A finished sweep must never leave an xray process behind - not on
+        # success, not on Ctrl+C, not on an unexpected error.
+        xray_mod.stop_all()
+        write_clean_outputs(ROOT, rows)
     return rows
 
 
 def main(argv=None):
     if sys.stdout and hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    # however the process ends (Ctrl+C elsewhere, SIGTERM, normal exit),
+    # xray children must not survive it
+    xray_mod.install_exit_hooks()
 
     ap = argparse.ArgumentParser(
         prog="python -m scanner",
@@ -201,12 +219,31 @@ def main(argv=None):
     ap.add_argument("--skip", action="append", choices=CHECKS,
                     help="disable a check (repeatable: search gemini gemini_api antigravity)")
     ap.add_argument("--dry-run", action="store_true", help="parse subscriptions and exit (no tests)")
+    ap.add_argument("--no-menu", action="store_true", help="skip the interactive start menu")
     ap.add_argument("--check-xray", action="store_true", help="ensure the Xray core is present, then exit")
     ap.add_argument("--watch", type=int, metavar="MINUTES",
                     help="re-scan every N minutes until Ctrl+C")
     args = ap.parse_args(argv)
 
     cfg = load_config()
+
+    # Interactive start menu: only for a plain `python -m scanner` (run.bat) in
+    # a real terminal - scripted/CI runs and explicit flags bypass it.
+    flags_bypass_menu = args.file or args.dry_run or args.watch or args.check_xray
+    if (not args.no_menu and not flags_bypass_menu
+            and sys.stdin.isatty() and sys.stdout.isatty()):
+        choice = show_menu(console, cfg)
+        if choice is None:  # user picked Exit
+            return
+        cfg["checks"] = choice.checks
+        cfg["concurrency"] = choice.concurrency
+        if choice.mode == "dry-run":
+            args.dry_run = True
+        elif choice.mode == "watch":
+            args.watch = choice.watch_minutes
+        elif choice.mode == "check-xray":
+            args.check_xray = True
+
     if args.concurrency:
         cfg["concurrency"] = max(1, args.concurrency)
     for skip in args.skip or []:
@@ -260,10 +297,3 @@ def main(argv=None):
             time.sleep(minutes * 60)
     else:
         once()
-
-
-if __name__ == "__main__":
-    try:
-        main()
-    except KeyboardInterrupt:
-        console.print("\n[yellow]Stopped.[/yellow]")

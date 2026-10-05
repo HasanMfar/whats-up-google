@@ -37,7 +37,8 @@ evidence behind every verdict.
 1. Double-click **`run.bat`**.
    - First time only: it installs the Python packages and downloads the Xray core.
    - `subscriptions.txt` opens in Notepad - paste your subscription URLs (one per
-     line), save, close. The scan starts by itself.
+     line), save, close. A **start menu** appears - press Enter for a full scan,
+     or pick which checks to run, a dry run, watch mode, or the Xray core check.
 2. Watch the live table: every config with its **ID**, server, exit country, latency
    and per-check result.
 3. When it finishes, import into v2rayN:
@@ -71,13 +72,18 @@ python -m scanner --concurrency 40 # test 40 nodes in parallel (default 20)
 python -m scanner --skip search    # drop a check: search/gemini/gemini_api/antigravity
 python -m scanner --watch 30       # re-scan every 30 minutes
 python -m scanner --file links.txt # local file of links instead of subscriptions.txt
+python -m scanner --no-menu        # skip the interactive start menu (scripted use)
 ```
 
 ## After each run
 
 - The tool **prints every file it wrote** - JSON/CSV reports plus each hand-picked
   subscription tier - with its path and size.
-- A subscription URL that returns no V2Ray links (an HTML page, a code list, ...)
+- Subscription payloads are decoded **tolerantly**: header lines, BOMs, unsupported
+  schemes mixed in, whole-body or per-line base64 (url-safe, unpadded, even
+  double-encoded) and percent-encoded bodies all work - unsupported lines are
+  skipped, the rest of the subscription is still used.
+- A subscription URL that returns no V2Ray links at all (an HTML page, a code list, ...)
   **fails loudly** with a 150-char preview of what it actually returned, instead of
   being silently skipped.
 - Settings live in `config.json` (concurrency, timeout, per-check toggles). It is
@@ -88,9 +94,14 @@ python -m scanner --file links.txt # local file of links instead of subscription
 
 - **Xray download fails** (GitHub blocked): set `HTTPS_PROXY`, or put the path to your
   own `xray.exe` in `xray_path` inside `config.json` (e.g. the one in your v2rayN folder).
-- **"SOCKS port is already in use"**: leftover xray.exe processes from an interrupted
-  scan are still running - close them in Task Manager, or change `socks_port_start`
+- **"SOCKS port is already in use"**: leftover xray.exe processes from an earlier
+  interrupted run. The scanner kills its own leftovers automatically at the start of
+  every sweep (matched by their config path, so only processes it started itself);
+  if a foreign program holds the port, close it or change `socks_port_start`
   in `config.json`.
+- **Closing the scanner closes xray too**: Ctrl+C, closing the console window, or
+  ending `python.exe` in Task Manager all take the xray processes down with them
+  (exit hooks + a Windows job object) - no leftovers to clean up by hand.
 - **"subscription did not return V2Ray links"**: that URL is not a V2Ray subscription
   (a page, a code list, another client's export) - fix the URL; the error shows a
   150-char preview of what it returned.
@@ -109,11 +120,12 @@ python -m scanner --file links.txt # local file of links instead of subscription
 ```
 scanner/
 ├── nodes.py           # parse vmess / vless / trojan / ss links, extract node IDs
-├── subscriptions.py   # fetch + decode subscriptions (base64 and raw link lists)
-├── xray.py            # auto-download the Xray core, one process per node
+├── subscriptions.py   # fetch + decode subscriptions, tolerant of any payload shape
+├── xray.py            # auto-download the Xray core, one process per node, guaranteed cleanup
 ├── probes.py          # the four Google checks, run in parallel over SOCKS
 ├── clean_sub.py       # hand-pick clean configs into importable subscriptions
 ├── report.py          # live table + JSON/CSV reports
+├── menu.py            # interactive start menu (rich, no extra dependencies)
 └── main.py            # CLI entry point and scan orchestration
 ```
 
