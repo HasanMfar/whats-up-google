@@ -68,7 +68,7 @@ def write_clean_outputs(root: Path, rows: list[dict]) -> dict[str, Path]:
 
 
 def print_summary(console, rows: list[dict], outputs: dict[str, Path]) -> None:
-    from .report import summarize
+    from .report import safe, summarize
 
     s = summarize(rows)
     gemini_n = len(pick_for_services(rows, ("gemini", "gemini_api")))
@@ -86,6 +86,6 @@ def print_summary(console, rows: list[dict], outputs: dict[str, Path]) -> None:
                   f"[green]{best_n}[/green] best (one per exit IP)")
     if outputs:
         for label, path in outputs.items():
-            console.print(f"  {path}  [dim]({label})[/dim]")
+            console.print(f"  {safe(path)}  [dim]({label})[/dim]")
     else:
         console.print("[red]No node passed - no subscription files written.[/red]")

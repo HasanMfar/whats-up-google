@@ -129,4 +129,43 @@ with httpx.Client(transport=httpx.MockTransport(handler_404)) as client:
     else:
         raise AssertionError("404 should raise")
 
+# --- parallel fetching: aggregates results, isolates failures, escapes errors --
+import argparse  # noqa: E402
+import io  # noqa: E402
+import tempfile  # noqa: E402
+
+from rich.console import Console  # noqa: E402
+
+from scanner import main as main_mod  # noqa: E402
+
+tmp = Path(tempfile.mkdtemp())
+(tmp / "subscriptions.txt").write_text(
+    "https://a.example/sub\nhttps://b.example/sub\nhttps://c.example/sub\n", encoding="utf-8")
+
+NASTY = "subscription did not return V2Ray links - first 150 chars: '[/api.waqi.info/]'"
+
+
+def fake_fetch(client, url):
+    if "b.example" in url:
+        raise ValueError(NASTY)
+    return PLAIN if "a.example" in url else "\n".join(LINKS[:2])
+
+
+buf = io.StringIO()
+orig_root, orig_fetch, orig_console = main_mod.ROOT, main_mod.fetch_subscription, main_mod.console
+main_mod.ROOT = tmp
+main_mod.fetch_subscription = fake_fetch
+main_mod.console = Console(file=buf, width=200, force_terminal=False)
+try:
+    nodes, stats = main_mod.gather_nodes(argparse.Namespace(file=None))
+finally:
+    main_mod.ROOT = orig_root
+    main_mod.fetch_subscription = orig_fetch
+    main_mod.console = orig_console
+
+assert stats["sources"] == 3, stats
+assert stats["fetch_errors"] == 1, stats
+assert len(nodes) == 4, [n.server for n in nodes]   # c.example repeats two links
+assert stats["duplicates"] == 2, stats
+assert "[/api.waqi.info/]" in buf.getvalue(), "error payload must be escaped, not parsed"
 print("all subscription decoding tests passed")

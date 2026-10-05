@@ -6,10 +6,24 @@ import json
 from datetime import datetime
 from pathlib import Path
 
+from rich.markup import escape
 from rich.table import Table
 
 CHECKS = ["search", "gemini", "gemini_api", "antigravity"]
 CHECK_LABELS = {"search": "Search", "gemini": "Gemini", "gemini_api": "API", "antigravity": "Anti"}
+
+
+def safe(text) -> str:
+    """Escape untrusted text before it reaches rich.
+
+    Node remarks, subscription URLs and error previews routinely contain square
+    brackets - IPv6 names like "[2a01:4f8::1]", adblock rules like
+    "[/api.waqi.info/]", markup-like payloads. Interpolated raw into a rich
+    string they are parsed as markup and raise MarkupError, which used to kill
+    a running sweep. Everything that comes from a subscription must go through
+    here.
+    """
+    return escape(str(text))
 
 VERDICT_STYLES = {
     "CLEAN": "[green]CLEAN[/green]",
@@ -50,11 +64,11 @@ def build_table(rows: list[dict], title: str = "Google access scan") -> Table:
         verdict = row["verdict"]
         cells = [
             str(i),
-            node.remark or "-",
-            node.protocol,
-            f"{node.server}:{node.port}",
-            node.id_prefix(),
-            (row.get("exit_ip") or {}).get("country_code", "") or "?",
+            safe(node.remark or "-"),
+            safe(node.protocol),
+            safe(f"{node.server}:{node.port}"),
+            safe(node.id_prefix()),
+            safe((row.get("exit_ip") or {}).get("country_code", "") or "?"),
             str(row["latency_ms"]) if row.get("latency_ms") is not None else "-",
         ]
         cells += [_check_cell(row["results"].get(c), verdict) for c in CHECKS]
@@ -76,7 +90,7 @@ def print_output_files(console, paths) -> None:
     console.print()
     console.print("[bold]Output files:[/bold]")
     for p in paths:
-        console.print(f"  {p}  [dim]({p.stat().st_size / 1024:.1f} KB)[/dim]")
+        console.print(f"  {safe(p)}  [dim]({p.stat().st_size / 1024:.1f} KB)[/dim]")
 
 
 def write_reports(root: Path, rows: list[dict], extra_meta: dict | None = None) -> tuple[Path, Path]:

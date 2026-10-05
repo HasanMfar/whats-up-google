@@ -27,5 +27,10 @@ echo.
 python -m scanner
 
 echo.
-echo Done. Import best_subscription.txt into v2rayN - full report is in the reports folder.
+if exist best_subscription.txt (
+  echo Done. Import best_subscription.txt into v2rayN - full report is in the reports folder.
+) else (
+  echo No importable subscription was written.
+  echo If you expected a full scan, run again and choose 1 (Full scan).
+)
 pause

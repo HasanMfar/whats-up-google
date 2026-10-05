@@ -42,5 +42,8 @@ jobs:
       - name: Menu tests
         run: python tests/test_menu.py
 
+      - name: Output safety tests
+        run: python tests/test_output_safety.py
+
       - name: Modules parse + CLI smoke test
         run: python -c "import ast,pathlib; [ast.parse(p.read_text(encoding='utf-8')) for p in pathlib.Path('scanner').glob('*.py')]" && python -m scanner --version

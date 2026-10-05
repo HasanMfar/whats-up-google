@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
@@ -17,11 +18,15 @@ from .clean_sub import print_summary, write_clean_outputs
 from .menu import show_menu
 from .nodes import Node, dedupe, parse_links
 from .probes import run_all_probes, verdict_from, node_latency_ms
-from .report import CHECKS, build_table, print_output_files, summarize, write_reports
+from .report import CHECKS, build_table, print_output_files, safe, summarize, write_reports
 from .subscriptions import fetch_subscription, load_subscription_urls, make_client
 
 ROOT = Path(__file__).resolve().parent.parent
 console = Console()
+
+# Subscription URLs are fetched in parallel: with hundreds of URLs (and many
+# slow ones) a sequential fetch is by far the longest part of a run.
+FETCH_CONCURRENCY = 32
 
 DEFAULT_CONFIG = {
     "concurrency": 20,
@@ -66,7 +71,7 @@ def gather_nodes(args) -> tuple[list[Node], dict]:
         nodes.extend(parsed)
         stats["parse_errors"] += len(errors)
         for line, err in errors:
-            console.print(f"[yellow]parse error:[/yellow] {line} -> {err}")
+            console.print(f"[yellow]parse error:[/yellow] {safe(line)} -> {safe(err)}")
         unique, dups = dedupe(nodes)
         stats["duplicates"] += dups
         return unique, stats
@@ -79,7 +84,7 @@ def gather_nodes(args) -> tuple[list[Node], dict]:
             "# Example: https://example.com/api/v1/client/subscribe?token=xxxx\n",
             encoding="utf-8",
         )
-        console.print(f"[red]{sub_path} was created - paste your subscription URLs into it and re-run.[/red]")
+        console.print(f"[red]{safe(sub_path)} was created - paste your subscription URLs into it and re-run.[/red]")
         sys.exit(1)
 
     urls = load_subscription_urls(sub_path)
@@ -88,22 +93,39 @@ def gather_nodes(args) -> tuple[list[Node], dict]:
         sys.exit(1)
 
     with make_client() as client:
-        for url in urls:
-            stats["sources"] += 1
-            console.print(f"[dim]Fetching subscription:[/dim] {url}")
+        print_lock = threading.Lock()
+
+        def fetch_one(url: str):
+            """Fetch + parse one subscription. Returns (url, error_text, nodes, errors)."""
             try:
                 text = fetch_subscription(client, url)
-            except Exception as e:  # noqa: BLE001
-                stats["fetch_errors"] += 1
-                console.print(f"[red]subscription failed:[/red] {type(e).__name__}: {e}")
-                if "did not return V2Ray links" in str(e):
-                    console.print("[yellow]  ^ check that this URL is a V2Ray subscription "
-                                  "link, not a page or a code list.[/yellow]")
-                continue
+            except Exception as e:  # noqa: BLE001 - one bad sub must not kill the rest
+                return url, "{}: {}".format(type(e).__name__, e), [], []
             parsed, errors = parse_links(text, source=url)
-            nodes.extend(parsed)
-            stats["parse_errors"] += len(errors)
-            console.print(f"[dim]  -> {len(parsed)} nodes parsed, {len(errors)} bad lines[/dim]")
+            return url, None, parsed, errors
+
+        workers = min(FETCH_CONCURRENCY, len(urls))
+        console.print(f"[dim]Fetching {len(urls)} subscription(s), {workers} at a time...[/dim]")
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = [pool.submit(fetch_one, url) for url in urls]
+            for fut in as_completed(futures):
+                url, err, parsed, errors = fut.result()
+                stats["sources"] += 1
+                with print_lock:
+                    if err is not None:
+                        stats["fetch_errors"] += 1
+                        # the message carries a payload preview full of [...] markup -
+                        # unescaped it raises MarkupError and kills the whole run
+                        console.print(f"[red]subscription failed:[/red] {safe(err)}")
+                        console.print(f"[dim]  {safe(url)}[/dim]")
+                        if "did not return V2Ray links" in err:
+                            console.print("[yellow]  ^ check that this URL is a V2Ray subscription "
+                                          "link, not a page or a code list.[/yellow]")
+                    else:
+                        nodes.extend(parsed)
+                        stats["parse_errors"] += len(errors)
+                        console.print(f"[dim]{safe(url)} -> {len(parsed)} nodes parsed, "
+                                      f"{len(errors)} bad lines[/dim]")
 
     unique, dups = dedupe(nodes)
     stats["duplicates"] += dups
@@ -150,10 +172,36 @@ def test_node(node: Node, exe: Path, socks_port: int, cfg: dict) -> dict:
         inst.stop()
 
 
+_output_write_failed = False
+
+
+def _write_outputs(root: Path, rows: list[dict]) -> dict:
+    """Write the hand-picked subscription files, warning once instead of aborting.
+
+    A locked output file (open editor, sync client, antivirus) must not kill a
+    sweep that is already minutes in.
+    """
+    global _output_write_failed
+    try:
+        return write_clean_outputs(root, rows)
+    except OSError as e:
+        if not _output_write_failed:
+            _output_write_failed = True
+            console.print(f"[yellow]Could not write subscription files: {safe(e)}[/yellow]")
+        return {}
+
+
 def run_scan(nodes: list[Node], cfg: dict, live_title: str) -> list[dict]:
     # Sweep up leftovers from earlier/interrupted runs before we bind ports.
     xray_mod.stop_all()
     xray_mod.kill_orphans(ROOT)
+    xray_mod.clear_stale_tmp(ROOT)
+    last_port = cfg["socks_port_start"] + len(nodes) - 1
+    if last_port > 65535:
+        console.print(f"[red]{len(nodes)} nodes need SOCKS ports "
+                      f"{cfg['socks_port_start']}-{last_port}, past the 65535 limit.[/red]")
+        console.print("[yellow]Lower socks_port_start in config.json, or scan fewer nodes.[/yellow]")
+        sys.exit(1)
     exe = xray_mod.ensure_xray(ROOT, cfg.get("xray_path", ""))
     rows: list[dict] = []
     ports = [cfg["socks_port_start"] + i for i in range(len(nodes))]
@@ -164,7 +212,15 @@ def run_scan(nodes: list[Node], cfg: dict, live_title: str) -> list[dict]:
             with ThreadPoolExecutor(max_workers=cfg["concurrency"]) as pool:
                 try:
                     for node, port in zip(nodes, ports):
-                        futures[pool.submit(test_node, node, exe, port, cfg)] = node
+                        try:
+                            futures[pool.submit(test_node, node, exe, port, cfg)] = node
+                        except (RuntimeError, OSError) as e:
+                            # e.g. "can't start new thread" at very high concurrency:
+                            # that one node is lost, the sweep itself must continue
+                            rows.append({"node": node, "results": {}, "exit_ip": {},
+                                         "latency_ms": None, "verdict": "ERROR",
+                                         "error": f"not scheduled: {type(e).__name__}",
+                                         "tested_at": datetime.now().isoformat(timespec="seconds")})
                     for fut in as_completed(futures):
                         try:
                             rows.append(fut.result())
@@ -177,7 +233,7 @@ def run_scan(nodes: list[Node], cfg: dict, live_title: str) -> list[dict]:
                         s = summarize(rows)
 
                         if time.time() - last_save > 5.0:
-                            write_clean_outputs(ROOT, rows)
+                            _write_outputs(ROOT, rows)
                             last_save = time.time()
 
                         live.update(build_table(
@@ -197,7 +253,7 @@ def run_scan(nodes: list[Node], cfg: dict, live_title: str) -> list[dict]:
         # A finished sweep must never leave an xray process behind - not on
         # success, not on Ctrl+C, not on an unexpected error.
         xray_mod.stop_all()
-        write_clean_outputs(ROOT, rows)
+        _write_outputs(ROOT, rows)
     return rows
 
 
@@ -280,7 +336,7 @@ def main(argv=None):
         json_path, csv_path = write_reports(ROOT, rows, extra_meta={
             "sources": stats["sources"], "checks_enabled": enabled,
         })
-        outputs = write_clean_outputs(ROOT, rows)
+        outputs = _write_outputs(ROOT, rows)
         print_summary(console, rows, outputs)
         print_output_files(console, [json_path, csv_path, *outputs.values()])
         return rows

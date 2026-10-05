@@ -441,6 +441,29 @@ def kill_orphans(root: Path, keep_pids=()) -> int:
     return killed
 
 
+def clear_stale_tmp(root: Path) -> int:
+    """Delete leftover cfg/log files from earlier runs.
+
+    Call this only after kill_orphans(), which guarantees no xray we started is
+    still running. Without it the temp dir grows without bound (thousands of
+    files after repeated sweeps) and stale configs keep claiming ports.
+    """
+    d = core_dir(root) / "tmp"
+    if not d.is_dir():
+        return 0
+    removed = 0
+    for pattern in ("cfg-*.json", "xray-*.log"):
+        for p in d.glob(pattern):
+            try:
+                p.unlink()
+                removed += 1
+            except OSError:
+                pass  # still held by a dying process; the next sweep retries
+    if removed:
+        print(f"Removed {removed} stale temp file(s) from earlier runs.")
+    return removed
+
+
 _CREATE_NO_WINDOW = 0x08000000 if os.name == "nt" else 0
 
 

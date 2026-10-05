@@ -377,9 +377,25 @@ finally:
         if p.poll() is None:
             p.kill()
 
-# --- 13. exit hooks install cleanly and are idempotent ------------------------
+# --- 13. clear_stale_tmp removes dead cfg/log files, keeps everything else -----
+reset()
+stale_root = Path(tempfile.mkdtemp(prefix="xray-stale-"))
+tmp_dir = x.core_dir(stale_root) / "tmp"
+tmp_dir.mkdir(parents=True, exist_ok=True)
+(tmp_dir / "cfg-11168.json").write_text("{}", encoding="utf-8")
+(tmp_dir / "xray-11168.log").write_text("log", encoding="utf-8")
+(tmp_dir / "keep-me.txt").write_text("keep", encoding="utf-8")
+removed = x.clear_stale_tmp(stale_root)
+assert removed == 2, removed
+assert not (tmp_dir / "cfg-11168.json").exists()
+assert not (tmp_dir / "xray-11168.log").exists()
+assert (tmp_dir / "keep-me.txt").exists(), "unrelated files must survive"
+assert x.clear_stale_tmp(stale_root) == 0, "second call has nothing left to do"
+print("13 clear_stale_tmp ok")
+
+# --- 14. exit hooks install cleanly and are idempotent ------------------------
 x.install_exit_hooks()
 x.install_exit_hooks()
-print("12/13 kill_orphans + exit hooks ok")
+print("14 exit hooks ok")
 
 print("all xray lifecycle tests passed")
