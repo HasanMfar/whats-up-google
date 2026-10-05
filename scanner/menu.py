@@ -21,7 +21,8 @@ _MODES = {
     "3": "dry-run",
     "4": "watch",
     "5": "check-xray",
-    "6": "exit",
+    "6": "check-subs",
+    "7": "exit",
 }
 
 
@@ -29,10 +30,11 @@ _MODES = {
 class MenuChoice:
     """What the user picked - merged into config/CLI args by main()."""
 
-    mode: str = "scan"                       # scan | dry-run | watch | check-xray
+    mode: str = "scan"                       # scan | dry-run | watch | check-xray | check-subs
     checks: dict = field(default_factory=dict)
     concurrency: int = 20
     watch_minutes: int = 0
+    prune: bool = False                      # for check-subs: rewrite subscriptions.txt
 
 
 def _banner() -> Panel:
@@ -44,7 +46,8 @@ def _banner() -> Panel:
         "  [cyan]3[/cyan] Dry run - parse subscriptions only, no testing",
         "  [cyan]4[/cyan] Watch - rescan automatically every N minutes",
         "  [cyan]5[/cyan] Check / install the Xray core",
-        "  [cyan]6[/cyan] Exit",
+        "  [cyan]6[/cyan] Check subscriptions - find dead URLs, prune them",
+        "  [cyan]7[/cyan] Exit",
     ]
     return Panel("\n".join(lines), title=f"Google Access Scanner v{__version__}",
                  title_align="left")
@@ -86,6 +89,10 @@ def show_menu(console: Console, cfg: dict) -> MenuChoice | None:
         choice.concurrency = max(
             1, IntPrompt.ask("Parallel node tests", default=choice.concurrency,
                              console=console))
+
+    if mode == "check-subs":
+        choice.prune = Confirm.ask(
+            "\nRemove the dead URLs from subscriptions.txt?", default=False, console=console)
 
     choice.mode = mode
     return choice

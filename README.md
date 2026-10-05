@@ -38,7 +38,8 @@ evidence behind every verdict.
    - First time only: it installs the Python packages and downloads the Xray core.
    - `subscriptions.txt` opens in Notepad - paste your subscription URLs (one per
      line), save, close. A **start menu** appears - press Enter for a full scan,
-     or pick which checks to run, a dry run, watch mode, or the Xray core check.
+     or pick which checks to run, a dry run, watch mode, a subscription check, or
+     the Xray core check.
 2. Watch the live table: every config with its **ID**, server, exit country, latency
    and per-check result.
 3. When it finishes, import into v2rayN:
@@ -73,6 +74,10 @@ python -m scanner --skip search    # drop a check: search/gemini/gemini_api/anti
 python -m scanner --watch 30       # re-scan every 30 minutes
 python -m scanner --file links.txt # local file of links instead of subscriptions.txt
 python -m scanner --no-menu        # skip the interactive start menu (scripted use)
+python -m scanner --limit 2000     # test at most 2000 nodes this run (chunked scanning)
+python -m scanner --retest         # test everything again, ignoring the history
+python -m scanner --check-subs     # report which subscription URLs are dead/non-V2Ray
+python -m scanner --prune-subs     # ...and remove the dead ones from subscriptions.txt
 ```
 
 ## After each run
@@ -94,6 +99,13 @@ python -m scanner --no-menu        # skip the interactive start menu (scripted u
 - Text that comes from subscriptions - URLs, payload previews, node names with
   brackets like `[2a01:4f8::1]` - is escaped before printing, and a locked output
   file or a scheduling hiccup can no longer abort a sweep that is minutes in.
+- **Big lists are scanned in chunks.** Every finished run records what it tested in
+  `reports/tested-nodes.json` (a hash per node - never the UUID or password), so the
+  next run skips those nodes automatically and `--limit N` moves on to fresh ones.
+  Entries expire after 30 days, and `--retest` ignores the history entirely.
+- **`--check-subs`** fetches every URL in `subscriptions.txt` in parallel and reports
+  the dead (404), non-V2Ray and Clash ones; adding `--prune-subs` rewrites the file
+  keeping only the working URLs, with the original saved as `subscriptions.txt.bak`.
 - Settings live in `config.json` (concurrency, timeout, per-check toggles). It is
   created once with defaults and **never overwritten** afterwards - precedence:
   defaults <- `config.json` <- CLI flags.
@@ -129,6 +141,7 @@ python -m scanner --no-menu        # skip the interactive start menu (scripted u
 scanner/
 ├── nodes.py           # parse vmess / vless / trojan / ss links, extract node IDs
 ├── subscriptions.py   # fetch + decode subscriptions, tolerant of any payload shape
+├── history.py         # remember tested nodes so huge lists can be scanned in chunks
 ├── xray.py            # auto-download the Xray core, one process per node, guaranteed cleanup
 ├── probes.py          # the four Google checks, run in parallel over SOCKS
 ├── clean_sub.py       # hand-pick clean configs into importable subscriptions

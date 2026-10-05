@@ -3,8 +3,11 @@ from __future__ import annotations
 
 import base64
 import urllib.parse
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import httpx
+
+from .nodes import parse_links
 
 SUB_UA = "v2rayNG/1.9.16"  # many subscription backends only return base64 to known clients
 _LINK_SCHEMES = ("vmess://", "vless://", "trojan://", "ss://")
@@ -123,6 +126,50 @@ def fetch_subscription(client: httpx.Client, url: str) -> str:
             "not a V2Ray subscription endpoint"
         )
     return decode_subscription(text, source=url)
+
+
+def check_urls(client: httpx.Client, urls: list[str], workers: int = 32) -> list[dict]:
+    """Classify every subscription URL: ok / http-error / not-v2ray / clash / error."""
+    def check(url: str) -> dict:
+        try:
+            text = fetch_subscription(client, url)
+        except httpx.HTTPStatusError as e:
+            return {"url": url, "status": "http-error", "nodes": 0,
+                    "detail": f"HTTP {e.response.status_code}"}
+        except ValueError as e:
+            clash = "Clash" in str(e)
+            return {"url": url, "status": "clash" if clash else "not-v2ray", "nodes": 0,
+                    "detail": ("Clash YAML subscription" if clash
+                               else "no vmess/vless/trojan/ss links")}
+        except Exception as e:  # noqa: BLE001 - a dead URL is a result, not a crash
+            return {"url": url, "status": "error", "nodes": 0, "detail": type(e).__name__}
+        nodes, _ = parse_links(text, source=url)
+        return {"url": url, "status": "ok", "nodes": len(nodes), "detail": ""}
+
+    rows: list[dict] = []
+    with ThreadPoolExecutor(max_workers=max(1, min(workers, len(urls)))) as pool:
+        for fut in as_completed([pool.submit(check, u) for u in urls]):
+            rows.append(fut.result())
+    return rows
+
+
+def prune_subscription_file(path, keep: list[str]) -> tuple[int, object]:
+    """Rewrite the URL file keeping only `keep`, after writing a .bak backup.
+
+    Returns (removed_count, backup_path); (0, None) when there is nothing to remove.
+    """
+    original = path.read_text(encoding="utf-8-sig")
+    entries = [ln.strip() for ln in original.splitlines()
+               if ln.strip() and not ln.strip().startswith("#")]
+    keep_set = set(keep)
+    surviving = [ln for ln in entries if ln in keep_set]
+    removed = len(entries) - len(surviving)
+    if removed <= 0:
+        return 0, None
+    backup = path.with_suffix(path.suffix + ".bak")
+    backup.write_text(original, encoding="utf-8")
+    path.write_text("\n".join(surviving) + "\n", encoding="utf-8")
+    return removed, backup
 
 
 def make_client() -> httpx.Client:

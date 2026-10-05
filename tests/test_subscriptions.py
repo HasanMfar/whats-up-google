@@ -168,4 +168,48 @@ assert stats["fetch_errors"] == 1, stats
 assert len(nodes) == 4, [n.server for n in nodes]   # c.example repeats two links
 assert stats["duplicates"] == 2, stats
 assert "[/api.waqi.info/]" in buf.getvalue(), "error payload must be escaped, not parsed"
+# --- check_urls classifies every failure mode, and pruning rewrites the file ---
+from scanner.subscriptions import check_urls, prune_subscription_file  # noqa: E402
+
+BODIES = {
+    "ok": PLAIN,
+    "dead": "",
+    "html": "<html><body>sign in</body></html>",
+    "clash": "proxies:\n  - name: a\n    cipher: aes-128-gcm\n",
+    "junk": "nothing useful here",
+}
+
+
+def subs_handler(request: httpx.Request) -> httpx.Response:
+    name = request.url.path.strip("/")
+    if name == "dead":
+        return httpx.Response(404, text="not found")
+    return httpx.Response(200, text=BODIES[name])
+
+
+subs_urls = [f"https://sub.example/{name}" for name in BODIES]
+with httpx.Client(transport=httpx.MockTransport(subs_handler)) as client:
+    rows = {r["url"]: r for r in check_urls(client, subs_urls)}
+
+assert rows["https://sub.example/ok"]["status"] == "ok"
+assert rows["https://sub.example/ok"]["nodes"] == len(LINKS)
+assert rows["https://sub.example/dead"]["status"] == "http-error"
+assert "404" in rows["https://sub.example/dead"]["detail"]
+assert rows["https://sub.example/html"]["status"] == "not-v2ray"
+assert rows["https://sub.example/clash"]["status"] == "clash"
+assert rows["https://sub.example/junk"]["status"] == "not-v2ray"
+assert all(r["nodes"] == 0 for r in rows.values() if r["status"] != "ok")
+
+sub_file = Path(tempfile.mkdtemp()) / "subscriptions.txt"
+sub_file.write_text("# comment\nhttps://a.example/sub\nhttps://b.example/sub\n"
+                    "https://c.example/sub\n", encoding="utf-8")
+removed, backup = prune_subscription_file(sub_file, ["https://a.example/sub",
+                                                     "https://c.example/sub"])
+assert removed == 1, removed
+assert sub_file.read_text(encoding="utf-8").splitlines() == ["https://a.example/sub",
+                                                             "https://c.example/sub"]
+assert backup is not None and backup.read_text(encoding="utf-8").startswith("# comment")
+removed2, backup2 = prune_subscription_file(sub_file, ["https://a.example/sub",
+                                                       "https://c.example/sub"])
+assert removed2 == 0 and backup2 is None, "nothing to remove the second time"
 print("all subscription decoding tests passed")

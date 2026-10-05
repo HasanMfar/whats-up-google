@@ -13,14 +13,16 @@ from queue import Queue
 
 from rich.console import Console
 from rich.live import Live
+from rich.table import Table
 
-from . import __version__, xray as xray_mod
+from . import __version__, history as history_mod, xray as xray_mod
 from .clean_sub import print_summary, write_clean_outputs
 from .menu import show_menu
 from .nodes import Node, dedupe, parse_links
 from .probes import run_all_probes, verdict_from, node_latency_ms
 from .report import CHECKS, build_table, print_output_files, safe, summarize, write_reports
-from .subscriptions import fetch_subscription, load_subscription_urls, make_client
+from .subscriptions import (check_urls, fetch_subscription, load_subscription_urls,
+                            make_client, prune_subscription_file)
 
 ROOT = Path(__file__).resolve().parent.parent
 console = Console()
@@ -198,6 +200,63 @@ def test_node(node: Node, exe: Path, ports: PortPool, cfg: dict) -> dict:
 
 _output_write_failed = False
 
+SUB_STATUS_STYLES = {
+    "ok": "[green]ok[/green]",
+    "http-error": "[red]dead[/red]",
+    "not-v2ray": "[yellow]not V2Ray[/yellow]",
+    "clash": "[yellow]clash[/yellow]",
+    "error": "[red]error[/red]",
+}
+SUB_STATUS_ORDER = {"http-error": 0, "error": 1, "not-v2ray": 2, "clash": 3, "ok": 4}
+
+
+def check_subscriptions(prune: bool = False) -> None:
+    """Report which subscription URLs are dead or not V2Ray, optionally prune them."""
+    sub_path = ROOT / "subscriptions.txt"
+    if not sub_path.exists():
+        console.print("[red]subscriptions.txt does not exist.[/red]")
+        sys.exit(1)
+    urls = load_subscription_urls(sub_path)
+    if not urls:
+        console.print("[red]subscriptions.txt has no URLs.[/red]")
+        sys.exit(1)
+    workers = min(FETCH_CONCURRENCY, len(urls))
+    console.print(f"[dim]Checking {len(urls)} subscription URL(s), {workers} at a time...[/dim]")
+    with make_client() as client:
+        rows = check_urls(client, urls)
+
+    counts: dict[str, int] = {}
+    for row in rows:
+        counts[row["status"]] = counts.get(row["status"], 0) + 1
+    console.print(f"\n[bold]Result:[/bold] [green]{counts.get('ok', 0)} ok[/green], "
+                  f"[red]{counts.get('http-error', 0)} dead[/red], "
+                  f"[yellow]{counts.get('not-v2ray', 0)} not V2Ray[/yellow], "
+                  f"[yellow]{counts.get('clash', 0)} clash[/yellow], "
+                  f"[red]{counts.get('error', 0)} error[/red]")
+
+    problems = sorted((r for r in rows if r["status"] != "ok"),
+                      key=lambda r: (SUB_STATUS_ORDER.get(r["status"], 9), r["url"]))
+    if problems:
+        table = Table(title="Subscriptions that need attention", expand=True)
+        table.add_column("Status")
+        table.add_column("Why", max_width=26, overflow="ellipsis")
+        table.add_column("URL", max_width=72, overflow="ellipsis")
+        for row in problems[:100]:
+            table.add_row(SUB_STATUS_STYLES.get(row["status"], row["status"]),
+                          safe(row["detail"]), safe(row["url"]))
+        console.print(table)
+        if len(problems) > 100:
+            console.print(f"[dim]...and {len(problems) - 100} more[/dim]")
+
+    if prune:
+        keep = [row["url"] for row in rows if row["status"] == "ok"]
+        removed, backup = prune_subscription_file(sub_path, keep)
+        if removed:
+            console.print(f"[yellow]Removed {removed} dead URL(s) from {safe(sub_path)}; "
+                          f"backup kept at {safe(backup)}[/yellow]")
+        else:
+            console.print("[green]Nothing to prune - every URL still works.[/green]")
+
 
 def _write_outputs(root: Path, rows: list[dict]) -> dict:
     """Write the hand-picked subscription files, warning once instead of aborting.
@@ -298,6 +357,14 @@ def main(argv=None):
                     help="disable a check (repeatable: search gemini gemini_api antigravity)")
     ap.add_argument("--dry-run", action="store_true", help="parse subscriptions and exit (no tests)")
     ap.add_argument("--no-menu", action="store_true", help="skip the interactive start menu")
+    ap.add_argument("--limit", type=int, metavar="N",
+                    help="test at most N nodes this run (chunked scanning of big lists)")
+    ap.add_argument("--retest", action="store_true",
+                    help="test every node again, ignoring the tested-nodes history")
+    ap.add_argument("--check-subs", action="store_true",
+                    help="check every subscription URL and report the dead/non-V2Ray ones")
+    ap.add_argument("--prune-subs", action="store_true",
+                    help="with --check-subs: rewrite subscriptions.txt keeping only working URLs")
     ap.add_argument("--check-xray", action="store_true", help="ensure the Xray core is present, then exit")
     ap.add_argument("--watch", type=int, metavar="MINUTES",
                     help="re-scan every N minutes until Ctrl+C")
@@ -307,7 +374,7 @@ def main(argv=None):
 
     # Interactive start menu: only for a plain `python -m scanner` (run.bat) in
     # a real terminal - scripted/CI runs and explicit flags bypass it.
-    flags_bypass_menu = args.file or args.dry_run or args.watch or args.check_xray
+    flags_bypass_menu = args.file or args.dry_run or args.watch or args.check_xray or args.check_subs
     if (not args.no_menu and not flags_bypass_menu
             and sys.stdin.isatty() and sys.stdout.isatty()):
         choice = show_menu(console, cfg)
@@ -321,11 +388,20 @@ def main(argv=None):
             args.watch = choice.watch_minutes
         elif choice.mode == "check-xray":
             args.check_xray = True
+        elif choice.mode == "check-subs":
+            check_subscriptions(prune=choice.prune)
+            return
 
     if args.concurrency:
         cfg["concurrency"] = max(1, args.concurrency)
     for skip in args.skip or []:
         cfg["checks"][skip] = False
+
+    if args.prune_subs:
+        args.check_subs = True
+    if args.check_subs:
+        check_subscriptions(prune=args.prune_subs)
+        return
 
     if args.check_xray:
         exe = xray_mod.ensure_xray(ROOT, cfg.get("xray_path", ""))
@@ -338,6 +414,21 @@ def main(argv=None):
                   f"bad lines: {stats['parse_errors']}, "
                   f"fetch errors: {stats['fetch_errors']})")
 
+    # Chunked scanning: remember what was tested, then cap this run.
+    history_path = ROOT / "reports" / "tested-nodes.json"
+    history = history_mod.load_history(history_path)
+    if not args.retest and history:
+        nodes, already = history_mod.partition(nodes, history)
+        if already:
+            console.print(f"[dim]Skipping {len(already)} node(s) already tested in the last "
+                          f"{history_mod.MAX_AGE_DAYS} days - use --retest to test them again[/dim]")
+    if args.limit:
+        remaining = len(nodes)
+        nodes = history_mod.apply_limit(nodes, args.limit)
+        if len(nodes) < remaining:
+            console.print(f"[yellow]This run tests {len(nodes)} of {remaining} remaining node(s); "
+                          f"{remaining - len(nodes)} are left for the next run[/yellow]")
+
     if args.dry_run:
         console.print(build_table(
             [{"node": n, "results": {}, "exit_ip": {}, "latency_ms": None,
@@ -346,6 +437,9 @@ def main(argv=None):
         return
 
     if not nodes:
+        if stats["sources"] or stats["fetch_errors"]:
+            console.print("[yellow]Nothing left to test - use --retest to scan everything again.[/yellow]")
+            return
         console.print("[red]No nodes found - nothing to scan.[/red]")
         sys.exit(1)
 
@@ -361,6 +455,12 @@ def main(argv=None):
         outputs = _write_outputs(ROOT, rows)
         print_summary(console, rows, outputs)
         print_output_files(console, [json_path, csv_path, *outputs.values()])
+        # remember what was tested so the next --limit run moves on
+        history_mod.record_tested(history, rows)
+        try:
+            history_mod.save_history(history_path, history)
+        except OSError as e:
+            console.print(f"[yellow]Could not update {safe(history_path.name)}: {safe(e)}[/yellow]")
         return rows
 
     if args.watch:

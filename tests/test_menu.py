@@ -70,8 +70,16 @@ assert choice.concurrency == 20
 choice, _ = run_menu(["5"])
 assert choice.mode == "check-xray"
 
-# 8. Exit returns None
-choice, _ = run_menu(["6"])
+# 8. subscription check mode, prune declined by default
+choice, _ = run_menu(["6", "n"])
+assert choice.mode == "check-subs" and choice.prune is False
+
+# 9. subscription check mode with pruning accepted
+choice, _ = run_menu(["6", "y"])
+assert choice.mode == "check-subs" and choice.prune is True
+
+# 10. Exit returns None
+choice, _ = run_menu(["7"])
 assert choice is None
 
 # 9. invalid menu choice re-prompts, then accepts a valid one
