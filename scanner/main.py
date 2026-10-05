@@ -9,6 +9,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
+from queue import Queue
 
 from rich.console import Console
 from rich.live import Live
@@ -132,7 +133,27 @@ def gather_nodes(args) -> tuple[list[Node], dict]:
     return unique, stats
 
 
-def test_node(node: Node, exe: Path, socks_port: int, cfg: dict) -> dict:
+class PortPool:
+    """Reusable local SOCKS ports, one per worker.
+
+    A static port per node index cannot work at scale: a big subscription set
+    parses into hundreds of thousands of nodes, and ports stop at 65535. Workers
+    take a port here and hand it back when the node is done.
+    """
+
+    def __init__(self, start: int, size: int):
+        self._free: Queue = Queue()
+        for i in range(max(1, size)):
+            self._free.put(start + i)
+
+    def acquire(self) -> int:
+        return self._free.get()
+
+    def release(self, port: int) -> None:
+        self._free.put(port)
+
+
+def test_node(node: Node, exe: Path, ports: PortPool, cfg: dict) -> dict:
     row = {
         "node": node,
         "results": {},
@@ -142,6 +163,7 @@ def test_node(node: Node, exe: Path, socks_port: int, cfg: dict) -> dict:
         "error": "",
         "tested_at": "",
     }
+    socks_port = ports.acquire()
     inst = xray_mod.XrayInstance(exe, node, socks_port, ROOT)
     try:
         try:
@@ -166,10 +188,12 @@ def test_node(node: Node, exe: Path, socks_port: int, cfg: dict) -> dict:
         return row
     finally:
         # One outer finally for every path (start failure, probe failure,
-        # unexpected exceptions): the instance can never outlive this test.
+        # unexpected exceptions): the instance can never outlive this test, and
+        # the port always goes back to the pool.
         if not row["tested_at"]:
             row["tested_at"] = datetime.now().isoformat(timespec="seconds")
         inst.stop()
+        ports.release(socks_port)
 
 
 _output_write_failed = False
@@ -196,24 +220,22 @@ def run_scan(nodes: list[Node], cfg: dict, live_title: str) -> list[dict]:
     xray_mod.stop_all()
     xray_mod.kill_orphans(ROOT)
     xray_mod.clear_stale_tmp(ROOT)
-    last_port = cfg["socks_port_start"] + len(nodes) - 1
-    if last_port > 65535:
-        console.print(f"[red]{len(nodes)} nodes need SOCKS ports "
-                      f"{cfg['socks_port_start']}-{last_port}, past the 65535 limit.[/red]")
-        console.print("[yellow]Lower socks_port_start in config.json, or scan fewer nodes.[/yellow]")
+    port_pool = PortPool(cfg["socks_port_start"], cfg["concurrency"] + 4)
+    if cfg["socks_port_start"] + cfg["concurrency"] + 4 > 65535:
+        console.print(f"[red]SOCKS ports {cfg['socks_port_start']}+{cfg['concurrency']} exceed "
+                      f"65535 - lower socks_port_start or concurrency in config.json.[/red]")
         sys.exit(1)
     exe = xray_mod.ensure_xray(ROOT, cfg.get("xray_path", ""))
     rows: list[dict] = []
-    ports = [cfg["socks_port_start"] + i for i in range(len(nodes))]
     futures = {}
     last_save = time.time()
     try:
         with Live(build_table(rows, live_title), console=console, refresh_per_second=2) as live:
             with ThreadPoolExecutor(max_workers=cfg["concurrency"]) as pool:
                 try:
-                    for node, port in zip(nodes, ports):
+                    for node in nodes:
                         try:
-                            futures[pool.submit(test_node, node, exe, port, cfg)] = node
+                            futures[pool.submit(test_node, node, exe, port_pool, cfg)] = node
                         except (RuntimeError, OSError) as e:
                             # e.g. "can't start new thread" at very high concurrency:
                             # that one node is lost, the sweep itself must continue

@@ -86,6 +86,14 @@ python -m scanner --no-menu        # skip the interactive start menu (scripted u
 - A subscription URL that returns no V2Ray links at all (an HTML page, a code list, ...)
   **fails loudly** with a 150-char preview of what it actually returned, instead of
   being silently skipped.
+- Subscription URLs are fetched **in parallel** (32 at a time), so even a list of
+  1000+ subscriptions is parsed in minutes instead of half an hour.
+- **Any list size works**: each worker takes a SOCKS port from a small pool and hands
+  it back when its node is done, so sweeping tens of thousands of nodes never runs
+  out of ports - and the temp folder stays small instead of growing one file per node.
+- Text that comes from subscriptions - URLs, payload previews, node names with
+  brackets like `[2a01:4f8::1]` - is escaped before printing, and a locked output
+  file or a scheduling hiccup can no longer abort a sweep that is minutes in.
 - Settings live in `config.json` (concurrency, timeout, per-check toggles). It is
   created once with defaults and **never overwritten** afterwards - precedence:
   defaults <- `config.json` <- CLI flags.
