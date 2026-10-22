@@ -148,8 +148,11 @@ class PortPool:
         for i in range(max(1, size)):
             self._free.put(start + i)
 
-    def acquire(self) -> int:
-        return self._free.get()
+    def acquire(self, timeout: float = 30.0) -> int:
+        try:
+            return self._free.get(timeout=timeout)
+        except Exception as e:
+            raise TimeoutError("Could not acquire local port (timeout/exhaustion)") from e
 
     def release(self, port: int) -> None:
         self._free.put(port)
@@ -165,7 +168,18 @@ def test_node(node: Node, exe: Path, ports: PortPool, cfg: dict) -> dict:
         "error": "",
         "tested_at": "",
     }
-    socks_port = ports.acquire()
+    try:
+        socks_port = ports.acquire()
+    except TimeoutError as e:
+        row["verdict"] = "ERROR"
+        row["error"] = str(e)
+        row["tested_at"] = datetime.now().isoformat(timespec="seconds")
+        return row
+    except Exception as e:  # noqa: BLE001
+        row["verdict"] = "ERROR"
+        row["error"] = f"port acquisition error: {type(e).__name__}: {e}"
+        row["tested_at"] = datetime.now().isoformat(timespec="seconds")
+        return row
     inst = xray_mod.XrayInstance(exe, node, socks_port, ROOT)
     try:
         try:
@@ -300,7 +314,7 @@ def run_scan(nodes: list[Node], cfg: dict, live_title: str) -> list[dict]:
                             # that one node is lost, the sweep itself must continue
                             rows.append({"node": node, "results": {}, "exit_ip": {},
                                          "latency_ms": None, "verdict": "ERROR",
-                                         "error": f"not scheduled: {type(e).__name__}",
+                                         "error": f"not scheduled: {type(e).__name__} (thread exhaustion)",
                                          "tested_at": datetime.now().isoformat(timespec="seconds")})
                     for fut in as_completed(futures):
                         try:
@@ -449,12 +463,12 @@ def main(argv=None):
 
     def once() -> list[dict]:
         rows = run_scan(nodes, cfg, "Google access scan")
-        json_path, csv_path = write_reports(ROOT, rows, extra_meta={
+        json_path, csv_path, html_path = write_reports(ROOT, rows, extra_meta={
             "sources": stats["sources"], "checks_enabled": enabled,
         })
         outputs = _write_outputs(ROOT, rows)
         print_summary(console, rows, outputs)
-        print_output_files(console, [json_path, csv_path, *outputs.values()])
+        print_output_files(console, [json_path, csv_path, html_path, *outputs.values()])
         # remember what was tested so the next --limit run moves on
         history_mod.record_tested(history, rows)
         try:

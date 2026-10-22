@@ -82,8 +82,9 @@ python -m scanner --prune-subs     # ...and remove the dead ones from subscripti
 
 ## After each run
 
-- The tool **prints every file it wrote** - JSON/CSV reports plus each hand-picked
+- The tool **prints every file it wrote** - JSON/CSV/HTML reports plus each hand-picked
   subscription tier - with its path and size.
+- **Interactive HTML Report:** Every scan now generates a self-contained, searchable, and sortable HTML report in `reports/` with a summary dashboard and color-coded status indicators.
 - Subscription payloads are decoded **tolerantly**: header lines, BOMs, unsupported
   schemes mixed in, whole-body or per-line base64 (url-safe, unpadded, even
   double-encoded) and percent-encoded bodies all work - unsupported lines are
@@ -91,6 +92,7 @@ python -m scanner --prune-subs     # ...and remove the dead ones from subscripti
 - A subscription URL that returns no V2Ray links at all (an HTML page, a code list, ...)
   **fails loudly** with a 150-char preview of what it actually returned, instead of
   being silently skipped.
+- **Reliability improvements:** Subscription URLs are fetched with **exponential backoff retries** for transient network errors. The scanner is more robust against resource exhaustion (timeouts for SOCKS port acquisition and better handling of thread exhaustion) to ensure sweeps complete gracefully.
 - Subscription URLs are fetched **in parallel** (32 at a time), so even a list of
   1000+ subscriptions is parsed in minutes instead of half an hour.
 - **Any list size works**: each worker takes a SOCKS port from a small pool and hands

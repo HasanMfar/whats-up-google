@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import base64
 import urllib.parse
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import httpx
@@ -114,18 +115,35 @@ def decode_subscription(text: str, source: str = "") -> str:
 
 
 def fetch_subscription(client: httpx.Client, url: str) -> str:
-    r = client.get(url)
-    r.raise_for_status()
-    text = r.text
-    low = text.lstrip(_ZW_PREFIX).lstrip().lower()
-    if "proxies:" in text and "cipher:" in text:
-        raise ValueError("looks like a Clash YAML subscription - this scanner supports V2Ray/Xray subs only")
-    if low.startswith("<!doctype html") or low.startswith("<html"):
-        raise ValueError(
-            "got an HTML page instead of a subscription - this URL is probably a website, "
-            "not a V2Ray subscription endpoint"
-        )
-    return decode_subscription(text, source=url)
+    """Fetch a subscription with exponential backoff for transient network errors."""
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            r = client.get(url)
+            r.raise_for_status()
+            text = r.text
+            low = text.lstrip(_ZW_PREFIX).lstrip().lower()
+            if "proxies:" in text and "cipher:" in text:
+                raise ValueError("looks like a Clash YAML subscription - this scanner supports V2Ray/Xray subs only")
+            if low.startswith("<!doctype html") or low.startswith("<html"):
+                raise ValueError(
+                    "got an HTML page instead of a subscription - this URL is probably a website, "
+                    "not a V2Ray subscription endpoint"
+                )
+            return decode_subscription(text, source=url)
+
+        except (httpx.RequestError, httpx.TimeoutException) as e:
+            if attempt == max_retries - 1:
+                raise
+            # Exponential backoff: 1s, 2s, 4s
+            sleep_time = 2 ** attempt
+            time.sleep(sleep_time)
+        except Exception:
+            # ValueError (Clash/HTML/Payload) should not be retried
+            raise
+
+    # This part should theoretically not be reachable due to the raise in the loop
+    raise Exception("Unexpected error in fetch_subscription loop")
 
 
 def check_urls(client: httpx.Client, urls: list[str], workers: int = 32) -> list[dict]:

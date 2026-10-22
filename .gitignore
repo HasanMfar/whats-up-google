@@ -8,6 +8,10 @@ reports/
 bin/
 *.tmp
 
+# secrets - never commit
+.env
+.env.local
+
 # python
 __pycache__/
 *.pyc

@@ -1,0 +1,74 @@
+name: Update Links
+
+on:
+  schedule:
+    - cron: '0 */6 * * *' # Runs every 6 hours
+  workflow_dispatch: # Allows manual triggering
+
+jobs:
+  update-and-push:
+    runs-on: ubuntu-latest
+    
+    steps:
+      # 1. Checkout this repository (the scanner tool)
+      - name: Checkout Scanner Repository
+        uses: actions/checkout@v4
+        with:
+          path: scanner-tool
+
+      # 2. Checkout the target private repository where links will be stored
+      - name: Checkout Target Repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ secrets.TARGET_REPO }} # e.g., 'your-username/private-links-repo'
+          token: ${{ secrets.PAT }} # Personal Access Token with repo access
+          path: target-repo
+
+      # 3. Setup Python
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # 4. Install dependencies
+      - name: Install dependencies
+        working-directory: ./scanner-tool
+        run: pip install -r requirements.txt
+
+      # 5. Provide subscriptions.txt from secrets
+      - name: Create subscriptions.txt
+        working-directory: ./scanner-tool
+        run: |
+          echo "${{ secrets.SUBSCRIPTIONS }}" > subscriptions.txt
+
+      # 6. Run the scanner
+      - name: Run Scanner
+        working-directory: ./scanner-tool
+        run: python -m scanner
+
+      # 7. Move generated files to a separate folder inside the target repository
+      - name: Move to output folder
+        run: |
+          # Create the folder in the target repo
+          mkdir -p target-repo/generated_links
+          
+          # Move the generated subscription and links text files to the target repo's folder
+          mv scanner-tool/*_subscription.txt target-repo/generated_links/ 2>/dev/null || true
+          mv scanner-tool/*_links.txt target-repo/generated_links/ 2>/dev/null || true
+
+      # 8. Commit and Push to the target repository
+      - name: Commit and Push Changes
+        working-directory: ./target-repo
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git add generated_links/
+          
+          # Only commit if there are changes
+          if git diff --staged --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Auto-update links [skip ci]"
+            git push
+          fi
