@@ -1,0 +1,539 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>What's up google — Xray access workbench</title>
+    <meta
+      name="description"
+      content="Check a V2Ray subscription config by config: which nodes Google lets through to Search, Gemini, the Gemini API and Antigravity, and export the ones that work. Parsing runs in your browser; probing runs on your machine."
+    />
+    <meta name="color-scheme" content="light" />
+    <meta name="theme-color" content="#e7ecf0" />
+    <link rel="stylesheet" href="./assets/app.css" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230f1a21'/%3E%3Crect x='5' y='7' width='5' height='18' fill='%23e7ecf0'/%3E%3Crect x='13' y='7' width='5' height='18' fill='%23e7ecf0'/%3E%3Crect x='21' y='7' width='5' height='18' fill='%231c6a88'/%3E%3C/svg%3E"
+    />
+    <meta property="og:title" content="What's up google — Xray access workbench" />
+    <meta
+      property="og:description"
+      content="Google treats every exit IP differently. Load your subscription, read each config on its own, and export the file that just works."
+    />
+    <meta property="og:type" content="website" />
+  </head>
+  <body>
+    <a class="visually-hidden" href="#load">Skip to the workbench</a>
+
+    <header class="topbar">
+      <div class="wrap topbar__inner">
+        <div class="brand">
+          <span class="brand__name" data-i18n="brand.name">What's up google</span>
+          <span class="brand__kind" data-i18n="brand.kind">Xray access workbench</span>
+        </div>
+
+        <nav class="steps" aria-label="Workbench steps">
+          <a class="step" href="#load" data-step="load">
+            <span class="step__no">01</span><span data-i18n="nav.load">Load</span>
+          </a>
+          <a class="step" href="#probe" data-step="probe">
+            <span class="step__no">02</span><span data-i18n="nav.probe">Probe</span>
+          </a>
+          <a class="step" href="#export" data-step="export">
+            <span class="step__no">03</span><span data-i18n="nav.export">Export</span>
+          </a>
+          <a class="step" href="#about" data-step="about">
+            <span class="step__no">·</span><span data-i18n="nav.about">How it works</span>
+          </a>
+        </nav>
+
+        <button class="lang-toggle" id="lang-toggle" type="button" data-i18n="lang.switch">فارسی</button>
+      </div>
+    </header>
+
+    <main class="wrap">
+      <section class="hero">
+        <div>
+          <p class="eyebrow" data-i18n="hero.eyebrow">Per-config access check</p>
+          <h1 data-i18n="hero.title">Google treats every exit IP differently. See exactly how.</h1>
+          <p class="hero__lede" data-i18n="hero.lede">
+            A subscription is never uniformly clean: one config gets Search but no Gemini, another the
+            reverse. Load your links and read each config on its own — then take away the file that
+            just works.
+          </p>
+        </div>
+
+        <div class="readout" aria-live="polite">
+          <span class="readout__label" id="readout-label">Nothing measured yet</span>
+          <div class="readout__figure">
+            <span class="readout__big" id="readout-clean">0</span>
+            <span class="readout__of">/</span>
+            <span class="readout__big" id="readout-total" style="font-size: 1.5rem">0</span>
+            <span class="readout__unit" id="readout-unit">clean</span>
+          </div>
+          <div class="ruler" id="ruler" aria-hidden="true"></div>
+          <div class="ruler__scale">
+            <span>0</span><span id="ruler-mid">—</span><span id="ruler-end">—</span>
+          </div>
+          <div class="readout__legend" id="readout-legend"></div>
+        </div>
+      </section>
+
+      <!-- 01 · LOAD ------------------------------------------------------- -->
+      <section class="panel" id="load" aria-labelledby="load-title">
+        <div class="panel__head">
+          <span class="panel__no">01</span>
+          <h2 class="panel__title" id="load-title" data-i18n="load.title">1 · Load your configs</h2>
+          <span class="panel__note" data-i18n="load.read.hint"
+            >Nothing leaves this browser tab. There is no server to send it to.</span
+          >
+        </div>
+
+        <div class="panel__body">
+          <div class="bridge" id="bridge-bar">
+            <span class="status-dot" id="bridge-dot" aria-hidden="true"></span>
+            <div class="bridge__text">
+              <div class="bridge__state" id="bridge-state">Local bridge · Not connected</div>
+              <div class="bridge__detail" id="bridge-detail"></div>
+            </div>
+            <button class="btn btn--quiet" id="bridge-toggle" type="button" data-i18n="bridge.connect">
+              Connect
+            </button>
+          </div>
+
+          <div id="bridge-form" hidden>
+            <div class="field">
+              <label class="field__label" for="bridge-url" data-i18n="bridge.url">Bridge address</label>
+              <input
+                class="text-input"
+                id="bridge-url"
+                type="url"
+                value="http://127.0.0.1:8787"
+                spellcheck="false"
+              />
+            </div>
+            <div class="field">
+              <label class="field__label" for="bridge-token" data-i18n="bridge.token"
+                >Pairing token</label
+              >
+              <input
+                class="text-input"
+                id="bridge-token"
+                type="text"
+                placeholder="printed by python -m scanner --serve"
+                autocomplete="off"
+                spellcheck="false"
+              />
+            </div>
+            <p class="note">
+              <span data-i18n="bridge.help"
+                >Xray cannot run inside a browser tab: a page has no raw TCP sockets and cannot start
+                a process. The bridge runs the probes on this machine and streams the results back
+                into this page. Start it with:</span
+              >
+              <br /><code data-i18n="bridge.help2">python -m scanner --serve</code><br />
+              <span data-i18n="bridge.help3"
+                >It listens on 127.0.0.1 only and requires the token it prints.</span
+              >
+            </p>
+          </div>
+
+          <div class="tabs" role="tablist" aria-label="Input">
+            <button
+              class="tab"
+              role="tab"
+              id="tab-paste"
+              aria-selected="true"
+              aria-controls="panel-paste"
+              data-tab="paste"
+              data-i18n="load.tab.paste"
+            >
+              Paste links or subscription
+            </button>
+            <button
+              class="tab"
+              role="tab"
+              id="tab-url"
+              aria-selected="false"
+              aria-controls="panel-url"
+              data-tab="url"
+              data-i18n="load.tab.url"
+            >
+              Subscription URL
+            </button>
+            <button
+              class="tab"
+              role="tab"
+              id="tab-report"
+              aria-selected="false"
+              aria-controls="panel-report"
+              data-tab="report"
+              data-i18n="load.tab.report"
+            >
+              Scan report
+            </button>
+          </div>
+
+          <div class="tabpanel" role="tabpanel" id="panel-paste" aria-labelledby="tab-paste">
+            <div class="field">
+              <label class="visually-hidden" for="paste-input">Node links or subscription body</label>
+              <textarea
+                id="paste-input"
+                placeholder="vmess://…&#10;vless://…&#10;trojan://…&#10;ss://…&#10;&#10;…or paste the base64 subscription body as-is"
+                spellcheck="false"
+                dir="ltr"
+              ></textarea>
+            </div>
+            <div class="actions">
+              <button class="btn btn--solid" id="read-btn" type="button" data-i18n="load.read">
+                Read
+              </button>
+              <label class="btn btn--quiet" for="file-input">
+                <span data-i18n="load.file">Choose file</span>
+              </label>
+              <input
+                class="visually-hidden"
+                type="file"
+                id="file-input"
+                accept=".txt,.json,.conf,text/plain,application/json"
+              />
+              <span class="muted" data-i18n="load.drop">or drop a file</span>
+            </div>
+          </div>
+
+          <div class="tabpanel" role="tabpanel" id="panel-url" aria-labelledby="tab-url" hidden>
+            <div class="field">
+              <label class="field__label" for="url-input">Subscription URLs — one per line</label>
+              <textarea
+                id="url-input"
+                placeholder="https://example.com/api/v1/client/subscribe?token=…"
+                spellcheck="false"
+                dir="ltr"
+              ></textarea>
+            </div>
+            <div class="actions">
+              <button class="btn btn--solid" id="fetch-urls-btn" type="button" disabled>
+                <span data-i18n="load.url.fetch">Fetch subscription</span>
+              </button>
+            </div>
+            <p class="note" id="url-note">
+              <span data-i18n="load.url.need_bridge"
+                >Start the local bridge to fetch URLs: python -m scanner --serve</span
+              >
+            </p>
+          </div>
+
+          <div class="tabpanel" role="tabpanel" id="panel-report" aria-labelledby="tab-report" hidden>
+            <div class="field">
+              <label class="visually-hidden" for="report-input">CLI scan report</label>
+              <textarea
+                id="report-input"
+                placeholder="reports/scan-20260101-120000.json"
+                spellcheck="false"
+                dir="ltr"
+              ></textarea>
+            </div>
+            <div class="actions">
+              <button class="btn btn--solid" id="read-report-btn" type="button" data-i18n="load.read">
+                Read
+              </button>
+            </div>
+            <p class="note">
+              Every CLI run writes <code>reports/scan-&lt;timestamp&gt;.json</code>. Drop it here to
+              re-read an old scan, export its tiers, or compare two runs — no re-probing.
+            </p>
+          </div>
+
+          <p class="note note--warn" id="load-status" role="status" aria-live="polite" hidden></p>
+        </div>
+      </section>
+
+      <!-- 02 · PROBE ------------------------------------------------------ -->
+      <section class="panel" id="probe" aria-labelledby="probe-title">
+        <div class="panel__head">
+          <span class="panel__no">02</span>
+          <h2 class="panel__title" id="probe-title" data-i18n="probe.title">2 · Probe the configs</h2>
+          <span class="panel__note" id="probe-count-note"></span>
+        </div>
+
+        <div class="panel__body">
+          <div class="scan-setup">
+            <div>
+              <span class="field__label" data-i18n="probe.checks">Checks</span>
+              <div class="check-group" id="check-group">
+                <label class="check-chip"
+                  ><input type="checkbox" value="search" checked /><span>Search</span></label
+                >
+                <label class="check-chip"
+                  ><input type="checkbox" value="gemini" checked /><span>Gemini</span></label
+                >
+                <label class="check-chip"
+                  ><input type="checkbox" value="gemini_api" checked /><span>Gemini API</span></label
+                >
+                <label class="check-chip"
+                  ><input type="checkbox" value="antigravity" checked /><span>Antigravity</span></label
+                >
+              </div>
+            </div>
+            <div>
+              <label class="field__label" for="concurrency" data-i18n="probe.concurrency"
+                >Parallel</label
+              >
+              <select class="select-input" id="concurrency" style="width: 92px">
+                <option value="10">10</option>
+                <option value="20" selected>20</option>
+                <option value="40">40</option>
+                <option value="60">60</option>
+              </select>
+            </div>
+            <div class="actions" style="margin: 0">
+              <button class="btn btn--solid" id="scan-btn" type="button" disabled>
+                <span data-i18n="probe.start_disabled">Load configs first</span>
+              </button>
+              <button class="btn btn--quiet" id="cancel-btn" type="button" hidden data-i18n="probe.cancel">
+                Stop
+              </button>
+            </div>
+          </div>
+
+          <div class="progress" id="progress" hidden>
+            <div class="progress__bar"><div class="progress__fill" id="progress-fill"></div></div>
+            <div class="progress__meta">
+              <span id="progress-text"></span>
+              <span id="progress-pct"></span>
+            </div>
+          </div>
+
+          <p class="note" id="probe-idle" data-i18n="probe.idle">
+            No scan has run for these configs yet. Connect the local bridge and probe them, or import
+            a report from the CLI.
+          </p>
+
+          <div class="summary-strip" id="summary-strip" hidden></div>
+          <div class="tally" id="tally" hidden></div>
+
+          <div class="toolbar" id="toolbar" hidden>
+            <label class="visually-hidden" for="search-input">Filter configs</label>
+            <input
+              class="text-input"
+              id="search-input"
+              type="search"
+              placeholder="Search remark, server, ID…"
+            />
+            <label class="visually-hidden" for="verdict-filter">Verdict</label>
+            <select class="select-input" id="verdict-filter"></select>
+            <label class="visually-hidden" for="proto-filter">Protocol</label>
+            <select class="select-input" id="proto-filter"></select>
+            <label class="visually-hidden" for="net-filter">Transport</label>
+            <select class="select-input" id="net-filter"></select>
+          </div>
+
+          <div class="table-wrap" id="table-wrap" hidden>
+            <table class="node-table">
+              <thead>
+                <tr id="table-head"></tr>
+              </thead>
+              <tbody id="table-body"></tbody>
+            </table>
+          </div>
+
+          <div class="empty-state" id="empty-state" hidden></div>
+
+          <div class="table-foot" id="table-foot" hidden>
+            <span id="showing"></span>
+            <button class="btn btn--quiet" id="more-btn" type="button" hidden></button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 03 · EXPORT ----------------------------------------------------- -->
+      <section class="panel" id="export" aria-labelledby="export-title">
+        <div class="panel__head">
+          <span class="panel__no">03</span>
+          <h2 class="panel__title" id="export-title" data-i18n="export.title">
+            3 · Take away a subscription
+          </h2>
+        </div>
+        <div class="panel__body">
+          <p class="panel__hint" data-i18n="export.hint">
+            Picked from the results above, encoded exactly like the CLI writes them. Import the base64
+            file directly into v2rayN.
+          </p>
+          <div class="tier-grid" id="tier-grid"></div>
+          <p class="note" id="export-note" hidden data-i18n="export.need_scan">
+            Probe or import a report to pick configs.
+          </p>
+        </div>
+      </section>
+
+      <!-- ABOUT ----------------------------------------------------------- -->
+      <section class="panel" id="about" aria-labelledby="about-title">
+        <div class="panel__head">
+          <span class="panel__no">·</span>
+          <h2 class="panel__title" id="about-title" data-i18n="about.title">How this works</h2>
+          <span class="panel__note">
+            <a href="https://github.com/HasanMfar/whats-up-google" target="_blank" rel="noreferrer"
+              >HasanMfar/whats-up-google</a
+            >
+          </span>
+        </div>
+        <div class="panel__body">
+          <p class="panel__hint" data-i18n="about.lede">
+            Each config gets its own temporary Xray process and its own local SOCKS port. Real requests
+            go through that node to Google, and the response decides the verdict. Nothing is trusted,
+            nothing is sampled.
+          </p>
+
+          <div class="about-grid">
+            <div>
+              <h3 data-i18n="about.where">What runs where</h3>
+              <table class="where-table">
+                <thead>
+                  <tr>
+                    <th data-i18n="about.where.task">Task</th>
+                    <th data-i18n="about.where.browser">In this page</th>
+                    <th data-i18n="about.where.bridge">Local bridge</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td data-i18n="about.row.decode">Decode subscriptions, parse links, dedupe</td>
+                    <td class="yes">yes</td>
+                    <td class="yes">yes</td>
+                  </tr>
+                  <tr>
+                    <td data-i18n="about.row.inspect">Inspect every field of a config</td>
+                    <td class="yes">yes</td>
+                    <td class="yes">yes</td>
+                  </tr>
+                  <tr>
+                    <td data-i18n="about.row.tiers">Pick and export subscriptions</td>
+                    <td class="yes">yes</td>
+                    <td class="yes">yes</td>
+                  </tr>
+                  <tr>
+                    <td data-i18n="about.row.report">Read a CLI scan report</td>
+                    <td class="yes">yes</td>
+                    <td class="yes">yes</td>
+                  </tr>
+                  <tr>
+                    <td data-i18n="about.row.probe">Open a tunnel and send probes</td>
+                    <td class="no">no</td>
+                    <td class="yes">yes</td>
+                  </tr>
+                  <tr>
+                    <td data-i18n="about.row.xray">Run the Xray core</td>
+                    <td class="no">no</td>
+                    <td class="yes">yes</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <p class="note" style="margin-top: 16px" data-i18n="about.why">
+                Why the browser cannot run Xray: a tab has no raw TCP or UDP sockets, no SOCKS
+                listener, and no way to start a native binary. Xray needs all three, so the probing
+                half stays on your machine — and the page drives it over loopback.
+              </p>
+            </div>
+
+            <div>
+              <h3 data-i18n="about.verdict.title">Verdicts</h3>
+              <ul class="verdict-notes">
+                <li>
+                  <span class="badge is-clean" data-i18n="verdict.CLEAN">Clean</span>
+                  <span data-i18n="about.verdict.clean"
+                    >Every check passed; Google does not flag this node.</span
+                  >
+                </li>
+                <li>
+                  <span class="badge is-flagged" data-i18n="verdict.FLAGGED">Flagged</span>
+                  <span data-i18n="about.verdict.flagged"
+                    >At least one check hit a block: captcha, region block, or the API location
+                    error.</span
+                  >
+                </li>
+                <li>
+                  <span class="badge is-dead" data-i18n="verdict.DEAD">Dead</span>
+                  <span data-i18n="about.verdict.dead"
+                    >No HTTP response got through the node at all.</span
+                  >
+                </li>
+                <li>
+                  <span class="badge is-error" data-i18n="verdict.ERROR">Error</span>
+                  <span data-i18n="about.verdict.error"
+                    >The node answered, but a probe errored. Re-run to confirm.</span
+                  >
+                </li>
+              </ul>
+
+              <h3 style="margin-top: 22px" data-i18n="about.detect.title">
+                How a block is detected
+              </h3>
+              <ul class="verdict-notes">
+                <li>
+                  <span class="mono-inline">search</span>
+                  <span data-i18n="about.detect.search"
+                    >Redirected to /sorry, or an unusual-traffic marker.</span
+                  >
+                </li>
+                <li>
+                  <span class="mono-inline">gemini</span>
+                  <span data-i18n="about.detect.gemini"
+                    >403/429, the country-block page, or /unsupported.</span
+                  >
+                </li>
+                <li>
+                  <span class="mono-inline">gemini_api</span>
+                  <span data-i18n="about.detect.api"
+                    >"User location is not supported for the API use" means blocked. Any other API
+                    error means the location is accepted.</span
+                  >
+                </li>
+                <li>
+                  <span class="mono-inline">antigravity</span>
+                  <span data-i18n="about.detect.anti">403/429 or a block page.</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="wrap footer__inner">
+        <p data-i18n="footer.disclaimer">
+          Diagnostic tool for your own configs. It is not a proxy and provides no circumvention of its
+          own — every request goes through a config you already have.
+        </p>
+        <div class="footer__links">
+          <a href="https://github.com/HasanMfar/whats-up-google" target="_blank" rel="noreferrer"
+            >GitHub</a
+          >
+          <a href="https://github.com/HasanMfar/whats-up-google/blob/main/README.md" target="_blank" rel="noreferrer"
+            >README</a
+          >
+          <a href="https://github.com/HasanMfar/whats-up-google/blob/main/LICENSE" target="_blank" rel="noreferrer"
+            >MIT</a
+          >
+        </div>
+      </div>
+    </footer>
+
+    <div class="drawer-backdrop" id="drawer-backdrop"></div>
+    <aside class="drawer" id="drawer" aria-hidden="true" aria-labelledby="drawer-title">
+      <div class="drawer__head">
+        <span class="drawer__title" id="drawer-title">Config</span>
+        <button class="btn btn--quiet" id="drawer-copy" type="button" style="margin-inline-start: auto">
+          Copy link
+        </button>
+        <button class="btn btn--quiet" id="drawer-close" type="button" aria-label="Close">✕</button>
+      </div>
+      <div class="drawer__body" id="drawer-body"></div>
+    </aside>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script type="module" src="./assets/app.js"></script>
+  </body>
+</html>

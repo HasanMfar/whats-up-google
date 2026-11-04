@@ -55,6 +55,42 @@ Each file is a base64 subscription - import it directly. `*_links.txt` holds the
 nodes as raw links. Full details (exit IP, ISP/ASN, per-check status) are in
 `reports/scan-<timestamp>.json` / `.csv`.
 
+## Web workbench (GitHub Pages)
+
+**[hasanmfar.github.io/whats-up-google](https://hasanmfar.github.io/whats-up-google/)** — the same
+tool as a page: load a subscription, read every config, open any node's every field, and leave with
+the same four importable tiers.
+
+It is plain HTML/CSS/JS in [`docs/`](docs) — no build step, no CDN, no fonts or scripts fetched
+from Google (the very network this tool exists for). Everything a browser *can* do, it does:
+
+| In the page | Needs the local bridge |
+|---|---|
+| decode subscription bodies (base64, URL-safe, per-line, double-encoded, percent-encoded) | open a tunnel per config |
+| parse vmess / vless / trojan / ss and every transport + security field | send the four Google probes |
+| dedupe, search, sort, filter, inspect any node | run the Xray core |
+| read a `reports/scan-*.json` from an earlier CLI run | fetch subscription URLs (CORS blocks them) |
+| pick and download the four tiers — byte-identical to the CLI | |
+
+### Why Xray cannot run in the page
+
+A tab has no raw TCP or UDP sockets, no SOCKS listener, and no way to start a native binary. Xray
+needs all three, so the probing half stays on your machine and the page drives it over loopback:
+
+```bash
+python -m scanner --serve        # http://127.0.0.1:8787 + a pairing token
+python -m scanner --serve --open # ...and open the workbench
+```
+
+The bridge serves the workbench itself too, so the whole flow works with no internet at all. It
+binds `127.0.0.1` only, needs the token it prints, and answers only the GitHub Pages origin (plus
+any `--allow-origin` you add), so an unrelated website cannot start scans on your machine.
+`--allow-remote` is required to bind anything else.
+
+Publishing: [`.github/workflows/pages.yml`](.github/workflows/pages.yml) deploys `docs/` on every
+push to `main`. Once, in the repository settings, set **Pages → Build and deployment →
+Source: GitHub Actions**.
+
 ## Verdicts
 
 | Verdict | Meaning |
@@ -78,6 +114,8 @@ python -m scanner --limit 2000     # test at most 2000 nodes this run (chunked s
 python -m scanner --retest         # test everything again, ignoring the history
 python -m scanner --check-subs     # report which subscription URLs are dead/non-V2Ray
 python -m scanner --prune-subs     # ...and remove the dead ones from subscriptions.txt
+python -m scanner --serve          # web workbench + local bridge on 127.0.0.1:8787
+python -m scanner --serve --open   # ...and open it in the browser
 ```
 
 ## After each run
@@ -140,6 +178,10 @@ python -m scanner --prune-subs     # ...and remove the dead ones from subscripti
 ## Project structure
 
 ```
+docs/                  # GitHub Pages workbench - static, no build step
+├── index.html         # the page: load, probe, export
+└── assets/            # app.js (UI + bridge client), parse.js, tiers.js, i18n.js, app.css
+
 scanner/
 ├── nodes.py           # parse vmess / vless / trojan / ss links, extract node IDs
 ├── subscriptions.py   # fetch + decode subscriptions, tolerant of any payload shape
@@ -149,6 +191,7 @@ scanner/
 ├── clean_sub.py       # hand-pick clean configs into importable subscriptions
 ├── report.py          # live table + JSON/CSV reports
 ├── menu.py            # interactive start menu (rich, no extra dependencies)
+├── server.py          # loopback bridge: runs probes for the web workbench
 └── main.py            # CLI entry point and scan orchestration
 ```
 

@@ -380,15 +380,33 @@ def main(argv=None):
     ap.add_argument("--prune-subs", action="store_true",
                     help="with --check-subs: rewrite subscriptions.txt keeping only working URLs")
     ap.add_argument("--check-xray", action="store_true", help="ensure the Xray core is present, then exit")
+    ap.add_argument("--serve", nargs="?", const="127.0.0.1:8787", metavar="HOST:PORT",
+                    help="run the local web bridge for the GitHub Pages workbench "
+                         "(default 127.0.0.1:8787) and keep it running")
+    ap.add_argument("--open", action="store_true",
+                    help="with --serve: open the workbench in your browser")
+    ap.add_argument("--allow-origin", action="append", metavar="ORIGIN", default=[],
+                    help="with --serve: extra browser origin allowed to call the bridge")
+    ap.add_argument("--allow-remote", action="store_true",
+                    help="with --serve: permit binding a non-loopback address (the bridge can start scans)")
     ap.add_argument("--watch", type=int, metavar="MINUTES",
                     help="re-scan every N minutes until Ctrl+C")
     args = ap.parse_args(argv)
 
     cfg = load_config()
 
+    # The web bridge is a server, not a scan: it must never open the start menu.
+    if args.serve is not None:
+        from .server import serve
+
+        serve(args.serve, cfg, open_browser=args.open,
+              allow_origins=args.allow_origin, allow_remote=args.allow_remote)
+        return
+
     # Interactive start menu: only for a plain `python -m scanner` (run.bat) in
     # a real terminal - scripted/CI runs and explicit flags bypass it.
-    flags_bypass_menu = args.file or args.dry_run or args.watch or args.check_xray or args.check_subs
+    flags_bypass_menu = (args.file or args.dry_run or args.watch or args.check_xray
+                         or args.check_subs or args.serve is not None)
     if (not args.no_menu and not flags_bypass_menu
             and sys.stdin.isatty() and sys.stdout.isatty()):
         choice = show_menu(console, cfg)
