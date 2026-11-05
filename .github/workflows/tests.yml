@@ -45,14 +45,16 @@ jobs:
       - name: Output safety tests
         run: python tests/test_output_safety.py
 
+      # Ahead of the history suite: that one carries a time-dependent stamp and
+      # stops the job, and a guard nobody runs is no guard at all.
+      - name: Workbench parser tests
+        run: node tests/test_web_parse.mjs
+
       - name: History / chunking tests
         run: python tests/test_history.py
 
       - name: Web bridge tests
         run: python tests/test_server.py
-
-      - name: Workbench parser tests
-        run: node tests/test_web_parse.mjs
 
       - name: Modules parse + CLI smoke test
         run: python -c "import ast,pathlib; [ast.parse(p.read_text(encoding='utf-8')) for p in pathlib.Path('scanner').glob('*.py')]" && python -m scanner --version
