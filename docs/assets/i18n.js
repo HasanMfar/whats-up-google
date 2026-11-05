@@ -59,6 +59,13 @@ export const STRINGS = {
     "bridge.bad_token": "The bridge rejected that token.",
     "bridge.unreachable": "No bridge answered at that address.",
     "bridge.docs": "Served locally? The bridge also serves this page at its own address.",
+    "bridge.get.title": "One file runs the probes — no clone, no install",
+    "bridge.get.download": "Download the bridge",
+    "bridge.get.copy": "Copy command",
+    "bridge.get.copied": "Command copied",
+    "bridge.get.why":
+      "A single .pyz with everything inside: no git, no pip, no virtualenv. Python 3.9+ is the only requirement, and the Xray core downloads itself on the first scan.",
+    "bridge.get.cli": "From a source checkout: python -m scanner --serve",
 
     "probe.title": "2 · Probe the configs",
     "probe.idle": "No scan has run for these configs yet. Connect the local bridge and probe them, or import a report from the CLI.",
@@ -222,6 +229,13 @@ export const STRINGS = {
     "bridge.bad_token": "پل این توکن را نپذیرفت.",
     "bridge.unreachable": "هیچ پلی در این آدرس پاسخ نداد.",
     "bridge.docs": "از خود پل باز کردی؟ پل همین صفحه را هم روی آدرس خودش سرو می‌کند.",
+    "bridge.get.title": "یک فایل، بدون کلون و بدون نصب",
+    "bridge.get.download": "دانلود پل",
+    "bridge.get.copy": "کپی دستور",
+    "bridge.get.copied": "دستور کپی شد",
+    "bridge.get.why":
+      "یک فایل pyz با همه‌چیز داخلش: نه git، نه pip، نه محیط مجازی. تنها نیاز، پایتون ۳٫۹ به بالا است و هستهٔ Xray در نخستین اسکن خودش دانلود می‌شود.",
+    "bridge.get.cli": "از یک کلون محلی: python -m scanner --serve",
 
     "probe.title": "۲ · کانفیگ‌ها را بررسی کن",
     "probe.idle": "برای این کانفیگ‌ها هنوز اسکنی اجرا نشده. پل محلی را وصل کن یا گزارشی از CLI وارد کن.",

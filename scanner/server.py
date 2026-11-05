@@ -42,6 +42,8 @@ from .report import CHECKS
 from .subscriptions import fetch_subscription, make_client
 
 DOCS_DIR = ROOT / "docs"
+# Where the one-file bridge sends people: it ships no static files itself.
+HOSTED_WORKBENCH = "https://hasanmfar.github.io/whats-up-google/"
 MAX_BODY = 8 * 1024 * 1024          # 8 MiB of links per request
 MAX_LINKS = 5000                    # one browser scan at a time
 MAX_LINK_CHARS = 8192
@@ -197,8 +199,11 @@ class Bridge:
 JOB_PATH = re.compile(r"^/api/job/([0-9a-f]{6,32})$")
 
 
-def make_handler(bridge: Bridge):
-    docs_root = DOCS_DIR.resolve()
+def make_handler(bridge: Bridge, docs_root: Path | None = None):
+    """Handler for one bridge. Without docs_root only /api/* is served."""
+    if docs_root is None:
+        docs_root = DOCS_DIR if DOCS_DIR.is_dir() else None
+    docs_root = docs_root.resolve() if docs_root is not None else None
 
     class Handler(BaseHTTPRequestHandler):
         server_version = f"whats-up-google/{__version__}"
@@ -223,6 +228,11 @@ def make_handler(bridge: Bridge):
                 self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Scanner-Token")
                 self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
                 self.send_header("Access-Control-Max-Age", "600")
+                # Chrome sends a Private Network Access preflight when a public
+                # page (the hosted workbench) calls loopback. Answering it here
+                # keeps the page able to reach the bridge from HTTPS.
+                if self.headers.get("Access-Control-Request-Private-Network"):
+                    self.send_header("Access-Control-Allow-Private-Network", "true")
 
         def _json(self, status: int, payload: dict, close: bool = False) -> None:
             body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -399,6 +409,9 @@ def make_handler(bridge: Bridge):
             self._json(200, {"job_id": job.id, "total": job.total, "status": job.status})
 
         def _serve_static(self, path: str) -> None:
+            if docs_root is None:
+                self._not_found()  # one-file bridge: the page lives on the site
+                return
             if path in ("", "/"):
                 path = "/index.html"
             relative = urllib.parse.unquote(path).lstrip("/")
@@ -480,6 +493,20 @@ def parse_bind(spec: str) -> tuple[str, int]:
         raise SystemExit(f"Bad --serve address {spec!r}; use HOST:PORT, e.g. 127.0.0.1:8787.")
 
 
+def workbench_url(host: str, port: int, token: str, docs_root: Path | None) -> str:
+    """URL to open for this bridge.
+
+    A checkout serves the workbench itself. The one-file .pyz has no docs/, so
+    it points at the hosted page and hands over its own address and token - the
+    user never pastes anything.
+    """
+    token_q = urllib.parse.quote(token, safe="")
+    if docs_root is not None:
+        return f"http://{host}:{port}/?token={token_q}"
+    bridge_q = urllib.parse.quote(f"http://{host}:{port}", safe="")
+    return f"{HOSTED_WORKBENCH}?bridge={bridge_q}&token={token_q}"
+
+
 def serve(spec: str, cfg: dict | None = None, open_browser: bool = False,
           allow_origins: list[str] | None = None, allow_remote: bool = False) -> None:
     """Run the loopback bridge until interrupted."""
@@ -489,8 +516,7 @@ def serve(spec: str, cfg: dict | None = None, open_browser: bool = False,
             f"Refusing to bind {host}: the bridge can start scans, so it stays on loopback.\n"
             "Pass --allow-remote only if you understand who can reach that address."
         )
-    if not DOCS_DIR.exists():
-        raise SystemExit(f"The web workbench is missing: {DOCS_DIR} not found.")
+    docs_root = DOCS_DIR if DOCS_DIR.is_dir() else None
 
     cfg = dict(cfg or load_config())
     origins = set(DEFAULT_ORIGINS)
@@ -503,7 +529,7 @@ def serve(spec: str, cfg: dict | None = None, open_browser: bool = False,
     token = secrets.token_urlsafe(9)
     bridge = Bridge(token, origins, cfg)
     try:
-        server = BridgeServer((host, port), make_handler(bridge))
+        server = BridgeServer((host, port), make_handler(bridge, docs_root))
     except OSError as e:
         raise SystemExit(
             f"Could not listen on {host}:{port} ({e}).\n"
@@ -511,7 +537,7 @@ def serve(spec: str, cfg: dict | None = None, open_browser: bool = False,
             f"  python -m scanner --serve 127.0.0.1:{port + 1}"
         )
 
-    url = f"http://{host}:{port}/?token={urllib.parse.quote(token)}"
+    url = workbench_url(host, port, token, docs_root)
     xray_version = _xray_version()
 
     printf = lambda *args: print(*args, flush=True)  # noqa: E731 - banner must not sit in a buffer
@@ -521,6 +547,8 @@ def serve(spec: str, cfg: dict | None = None, open_browser: bool = False,
     printf(f"  Token       {token}")
     printf(f"  Xray core   {xray_version or 'not downloaded yet (fetched on the first scan)'}")
     printf(f"  Origins     {', '.join(sorted(origins))}")
+    if docs_root is None:
+        printf("  Mode        one-file bridge - the workbench is the hosted page")
     printf()
     printf("  Xray cannot run inside a browser tab, so this process runs the probes.")
     printf("  Ctrl+C stops the bridge, and every Xray process with it.")

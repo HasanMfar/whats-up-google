@@ -105,6 +105,30 @@ try:
         r = client.post("/api/scan", json={"links": []}, headers=AUTH)
         expect(r.status_code == 400, "empty scan is rejected before Xray is touched")
 
+        # -- the one-file bridge: no docs/ to serve ------------------------
+        missing = Path(server_mod.__file__).resolve().parent / "_no_docs_here"
+        hosted = server_mod.workbench_url("127.0.0.1", 8787, "tk", None)
+        expect(hosted.startswith(server_mod.HOSTED_WORKBENCH), "one-file bridge points at the hosted page")
+        expect("bridge=http%3A%2F%2F127.0.0.1%3A8787" in hosted, "...and passes its own address")
+        expect(hosted.endswith("token=tk"), "...with the pairing token, so nothing is pasted")
+        checkout = server_mod.workbench_url("127.0.0.1", 8787, "tk", Path("docs"))
+        expect(checkout == "http://127.0.0.1:8787/?token=tk", "a checkout still serves its own copy")
+
+        bare = server_mod.ThreadingHTTPServer(("127.0.0.1", 0), server_mod.make_handler(bridge, missing))
+        bare.daemon_threads = True
+        threading.Thread(target=bare.serve_forever, kwargs={"poll_interval": 0.1}, daemon=True).start()
+        try:
+            base = f"http://127.0.0.1:{bare.server_address[1]}"
+            r = client.get(f"{base}/api/ping")
+            expect(r.status_code == 200 and r.json().get("ok") is True, "one-file bridge still answers ping")
+            r = client.post(f"{base}/api/parse", json=payload, headers=AUTH)
+            expect(r.status_code == 200 and len(r.json()["nodes"]) == 3, "one-file bridge still parses")
+            r = client.get(f"{base}/")
+            expect(r.status_code == 404, "one-file bridge serves no static files")
+        finally:
+            bare.shutdown()
+            bare.server_close()
+
         # -- bind parsing --------------------------------------------------
         expect(server_mod.parse_bind("127.0.0.1:9999") == ("127.0.0.1", 9999), "bind parse host:port")
         expect(server_mod.parse_bind("9999") == ("127.0.0.1", 9999), "bind parse bare port")

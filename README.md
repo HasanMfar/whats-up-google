@@ -77,15 +77,24 @@ from Google (the very network this tool exists for). Everything a browser *can* 
 A tab has no raw TCP or UDP sockets, no SOCKS listener, and no way to start a native binary. Xray
 needs all three, so the probing half stays on your machine and the page drives it over loopback:
 
+**Nothing to clone.** The page hands out the bridge as one file, built from this repository on
+every deploy and served next to the page:
+
 ```bash
-python -m scanner --serve        # http://127.0.0.1:8787 + a pairing token
-python -m scanner --serve --open # ...and open the workbench
+curl -LO https://hasanmfar.github.io/whats-up-google/whats-up-google-bridge.pyz
+python whats-up-google-bridge.pyz --serve
 ```
 
-The bridge serves the workbench itself too, so the whole flow works with no internet at all. It
-binds `127.0.0.1` only, needs the token it prints, and answers only the GitHub Pages origin (plus
-any `--allow-origin` you add), so an unrelated website cannot start scans on your machine.
-`--allow-remote` is required to bind anything else.
+Or click **Download the bridge** on the page and run the command it shows. The `.pyz` carries the
+scanner's own modules *and* its dependencies (httpx, socksio, rich), so there is no `git`, no
+`pip`, and no virtualenv — Python 3.9+ is the only requirement, and the Xray core downloads itself
+on the first scan. It prints the workbench URL with the token already attached; `--open` opens it
+for you.
+
+From a checkout, `python -m scanner --serve` still works and serves the page itself, so that path
+needs no internet at all. Either way the bridge binds `127.0.0.1` only, needs the token it prints,
+and answers only the GitHub Pages origin (plus any `--allow-origin` you add), so an unrelated
+website cannot start scans on your machine. `--allow-remote` is required to bind anything else.
 
 Publishing: [`.github/workflows/pages.yml`](.github/workflows/pages.yml) deploys `docs/` on every
 push to `main`. Once, in the repository settings, set **Pages → Build and deployment →

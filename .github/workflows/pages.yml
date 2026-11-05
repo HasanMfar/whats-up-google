@@ -32,6 +32,13 @@ jobs:
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
+      # The page hands out one file instead of asking visitors to clone the repo.
+      - name: Build the one-file bridge
+        run: |
+          python -m pip install --quiet --upgrade pip
+          python tools/build_bridge.py
+          python docs/whats-up-google-bridge.pyz --version
+
       - name: Upload workbench
         uses: actions/upload-pages-artifact@v3
         with:

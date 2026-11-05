@@ -941,6 +941,11 @@ function wireEvents() {
     if (event.key === "Enter") connectBridge();
   });
 
+  $("bridge-copy").addEventListener("click", async () => {
+    const command = "python whats-up-google-bridge.pyz --serve";
+    toast((await copyText(command)) ? t("bridge.get.copied") : "Copy failed", false);
+  });
+
   $("scan-btn").addEventListener("click", startScan);
   $("cancel-btn").addEventListener("click", cancelScan);
 
@@ -1030,12 +1035,14 @@ function init() {
 
   const params = new URLSearchParams(location.search);
   const tokenFromUrl = params.get("token");
+  // The one-file bridge opens this page itself, already paired.
+  const bridgeFromUrl = params.get("bridge");
   const savedUrl = localStorage.getItem("wug.bridge.url");
   const savedToken = localStorage.getItem("wug.bridge.token");
   const localOrigin = /^(127\.0\.0\.1|localhost)$/.test(location.hostname)
     ? location.origin
     : "http://127.0.0.1:8787";
-  state.bridge.url = savedUrl || localOrigin;
+  state.bridge.url = (bridgeFromUrl || savedUrl || localOrigin).replace(/\/+$/, "");
   state.bridge.token = tokenFromUrl || savedToken || "";
   $("bridge-url").value = state.bridge.url;
   $("bridge-token").value = state.bridge.token;

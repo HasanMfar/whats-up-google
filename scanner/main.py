@@ -24,7 +24,21 @@ from .report import CHECKS, build_table, print_output_files, safe, summarize, wr
 from .subscriptions import (check_urls, fetch_subscription, load_subscription_urls,
                             make_client, prune_subscription_file)
 
-ROOT = Path(__file__).resolve().parent.parent
+def _project_root() -> Path:
+    """Where config.json, bin/ and reports/ belong.
+
+    In a checkout that is the directory above the package. The workbench also
+    ships this code as a single .pyz, where __file__ points *inside* the
+    archive - nothing can be written there, so the archive's own folder is
+    used instead and `python bridge.pyz` keeps working with no repo.
+    """
+    entry = (sys.argv[0] if sys.argv else "") or ""
+    if entry.endswith(".pyz") and Path(entry).exists():
+        return Path(entry).resolve().parent
+    return Path(__file__).resolve().parent.parent
+
+
+ROOT = _project_root()
 console = Console()
 
 # Subscription URLs are fetched in parallel: with hundreds of URLs (and many

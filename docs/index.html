@@ -136,6 +136,32 @@
                 >It listens on 127.0.0.1 only and requires the token it prints.</span
               >
             </p>
+
+            <div class="bridge-get">
+              <p class="bridge-get__title" data-i18n="bridge.get.title">
+                One file runs the probes — no clone, no install
+              </p>
+              <div class="bridge-get__row">
+                <a
+                  class="btn btn--solid"
+                  href="./whats-up-google-bridge.pyz"
+                  download
+                  data-i18n="bridge.get.download"
+                  >Download the bridge</a
+                >
+                <code class="bridge-get__cmd">python whats-up-google-bridge.pyz --serve</code>
+                <button class="btn btn--quiet" id="bridge-copy" type="button" data-i18n="bridge.get.copy">
+                  Copy command
+                </button>
+              </div>
+              <p class="note" data-i18n="bridge.get.why">
+                A single .pyz with everything inside: no git, no pip, no virtualenv. Python 3.9+ is
+                the only requirement, and the Xray core downloads itself on the first scan.
+              </p>
+              <p class="note" data-i18n="bridge.get.cli">
+                From a source checkout: python -m scanner --serve
+              </p>
+            </div>
           </div>
 
           <div class="tabs" role="tablist" aria-label="Input">

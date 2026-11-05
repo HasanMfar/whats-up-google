@@ -1592,4 +1592,48 @@ html[dir="rtl"] .drawer.is-open {
   .node-table td.wide {
     max-width: 150px;
   }
+
+  .bridge-get__row .btn,
+  .bridge-get__cmd {
+    width: 100%;
+  }
+}
+
+/* ------------------------------------------- the one-file bridge offer ---- */
+.bridge-get {
+  margin-top: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--rule);
+  background: var(--panel);
+}
+
+.bridge-get__title {
+  margin: 0 0 10px;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.bridge-get__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.bridge-get__cmd {
+  padding: 7px 10px;
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  max-width: 100%;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.bridge-get .note {
+  margin: 10px 0 0;
 }

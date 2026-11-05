@@ -3,6 +3,8 @@ subscriptions.txt
 *_subscription.txt
 *_links.txt
 reports/
+# built by tools/build_bridge.py (CI builds it into the Pages artifact)
+docs/*.pyz
 
 # runtime / downloaded binaries
 bin/
