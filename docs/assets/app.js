@@ -48,6 +48,7 @@ const state = {
   sort: { key: "index", dir: "asc" },
   visibleLimit: 200,
   selectedKey: null,
+  activeStep: "load",
   lang: "en",
   bridge: {
     url: "http://127.0.0.1:8787",
@@ -143,6 +144,9 @@ function verdictLabel(verdict) {
 }
 
 function renderSteps() {
+  // Two different facts, two different marks: `is-done` is progress, `is-active`
+  // is where the reader is. Deriving the highlight from progress meant clicking
+  // a step jumped to the section but left the highlight behind.
   const done = {
     load: state.rows.length > 0,
     probe: state.scannedCount > 0,
@@ -152,9 +156,32 @@ function renderSteps() {
   for (const el of document.querySelectorAll(".step")) {
     const key = el.dataset.step;
     el.classList.toggle("is-done", Boolean(done[key]));
-    const activeKey = done.export ? "export" : done.probe ? "probe" : "load";
-    el.classList.toggle("is-active", key === activeKey);
+    const active = key === state.activeStep;
+    el.classList.toggle("is-active", active);
+    // What a screen reader announces as "you are here".
+    if (active) el.setAttribute("aria-current", "true");
+    else el.removeAttribute("aria-current");
   }
+}
+
+const STEP_SECTIONS = ["load", "probe", "export", "about"];
+
+function setActiveStep(key) {
+  if (!key || state.activeStep === key) return;
+  state.activeStep = key;
+  renderSteps();
+}
+
+function trackVisibleSection() {
+  const line = 120; // just under the sticky topbar
+  let current = STEP_SECTIONS[0];
+  for (const key of STEP_SECTIONS) {
+    const section = document.getElementById(key);
+    if (section && section.getBoundingClientRect().top <= line) current = key;
+  }
+  // The last section may never reach the line on a tall viewport.
+  const atBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4;
+  setActiveStep(atBottom ? STEP_SECTIONS[STEP_SECTIONS.length - 1] : current);
 }
 
 function renderReadout() {
@@ -892,6 +919,32 @@ function wireEvents() {
   for (const tab of document.querySelectorAll(".tab")) {
     tab.addEventListener("click", () => selectTab(tab.dataset.tab));
   }
+
+  // Highlight at once on click, then keep following the scroll position.
+  for (const step of document.querySelectorAll(".step")) {
+    step.addEventListener("click", () => setActiveStep(step.dataset.step));
+  }
+  // Called directly, not through requestAnimationFrame: rAF is suspended while
+  // a tab is in the background, which silently froze the highlight. Four rect
+  // reads per scroll tick cost nothing.
+  window.addEventListener("scroll", trackVisibleSection, { passive: true });
+  window.addEventListener("resize", trackVisibleSection, { passive: true });
+  // A scroll listener alone was not enough (the event never reached the page in
+  // one Chromium build). Observing the sections themselves is the same signal,
+  // computed by the browser: anything entering or leaving the reading band
+  // triggers a recount.
+  if ("IntersectionObserver" in window) {
+    const observer = new IntersectionObserver(trackVisibleSection, {
+      rootMargin: "-40% 0px -45% 0px",
+      threshold: [0, 0.25, 0.5, 0.75, 1],
+    });
+    for (const key of STEP_SECTIONS) {
+      const section = document.getElementById(key);
+      if (section) observer.observe(section);
+    }
+  }
+  setActiveStep(STEP_SECTIONS.find((key) => location.hash === `#${key}`) || "load");
+  trackVisibleSection();
 
   $("read-btn").addEventListener("click", () => {
     handleInput($("paste-input").value, "pasted links");
