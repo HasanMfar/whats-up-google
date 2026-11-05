@@ -1,10 +1,10 @@
 /* Hand-picking + export, in the browser.
  *
  * A port of scanner/clean_sub.py: the same four tiers, picked by the same
- * predicate, encoded exactly like the CLI writes them (newline-joined links,
- * one base64 subscription per tier).
+ * predicate. The export is the newline-joined link list - plain links, one
+ * clean config per line, no base64 subscription file.
  */
-import { b64EncodeUtf8 } from "./parse.js";
+import { isExportableLink } from "./parse.js";
 
 export const CHECK_ORDER = ["search", "gemini", "gemini_api", "antigravity"];
 
@@ -50,11 +50,16 @@ export function bestPerIp(rows) {
 }
 
 /**
- * Build the four importable subscriptions from scanned rows.
- * Returns [{ key, links, base64, count }] with empty links when nothing passed.
+ * Build the four importable tiers from scanned rows.
+ * Returns [{ key, links, count }] - plain links, one per config, no encoding.
  */
 export function buildTiers(rows) {
-  const scored = rows.filter((row) => row && row.node && row.node.raw && row.verdict && row.verdict !== "PENDING");
+  // An imported report is just JSON: its `raw` fields are not guaranteed to be
+  // links. Only single-line links of a supported scheme are ever written out,
+  // so an edited or malformed report cannot inject a line into the export.
+  const usable = (row) =>
+    row && row.node && isExportableLink(row.node.raw) && row.verdict && row.verdict !== "PENDING";
+  const scored = rows.filter(usable);
   const definitions = [
     {
       key: "best",
@@ -70,12 +75,7 @@ export function buildTiers(rows) {
       links: pickForServices(scored, ["antigravity"]).map((r) => r.node.raw),
     },
   ];
-  return definitions.map(({ key, links }) => ({
-    key,
-    links,
-    count: links.length,
-    base64: links.length ? b64EncodeUtf8(links.join("\n")) : "",
-  }));
+  return definitions.map(({ key, links }) => ({ key, links, count: links.length }));
 }
 
 export function summarize(rows) {

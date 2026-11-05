@@ -51,5 +51,8 @@ jobs:
       - name: Web bridge tests
         run: python tests/test_server.py
 
+      - name: Workbench parser tests
+        run: node tests/test_web_parse.mjs
+
       - name: Modules parse + CLI smoke test
         run: python -c "import ast,pathlib; [ast.parse(p.read_text(encoding='utf-8')) for p in pathlib.Path('scanner').glob('*.py')]" && python -m scanner --version

@@ -89,6 +89,14 @@ for bad, label in (
     else:
         raise AssertionError(f"{label}: expected ValueError")
 
+# a list of subscription ADDRESSES is not a subscription body - say so precisely
+try:
+    decode_subscription("https://a.example/sub\nhttps://b.example/sub", source="list")
+except ValueError as e:
+    assert "list of web addresses" in str(e), e
+else:
+    raise AssertionError("a URL list must be rejected with its own hint")
+
 
 # fetch_subscription: mock transport, no network
 def fetch_body(body: str, content_type: str = "text/plain") -> str:

@@ -8,6 +8,22 @@
 
 export const SCHEMES = ["vmess://", "vless://", "trojan://", "ss://"];
 const ZW_PREFIX = /^[\ufeff\u200b\u200c\u200d\u2060]+/;
+// Python's str.splitlines() breaks on more than \n: U+2028, U+2029 and \x85 too.
+// Splitting differently would merge two links into one line whose fragment
+// swallows the second link - and that merged line is what gets exported.
+const LINE_BREAK = /\r\n|[\n\r\v\f\x1c\x1d\x1e\x85\u2028\u2029]/;
+
+export function splitLines(text) {
+  return String(text).split(LINE_BREAK);
+}
+
+/** True when a raw link can be written to an export as one well-formed line. */
+export function isExportableLink(link) {
+  const s = String(link ?? "");
+  if (!s || s.length > 8192) return false;              // same per-link cap as the bridge
+  if (/[\u0000-\u001f\u2028\u2029\x85]/.test(s)) return false; // never inject a second line
+  return SCHEMES.some((scheme) => s.startsWith(scheme));
+}
 
 export class LinkParseError extends Error {}
 
@@ -239,7 +255,7 @@ export function parseLink(link, source = "") {
 export function parseLinks(text, source = "") {
   const nodes = [];
   const errors = [];
-  for (const rawLine of String(text).split(/\r?\n/)) {
+  for (const rawLine of splitLines(text)) {
     const line = stripZeroWidth(rawLine.trim());
     if (!line || line.startsWith("#") || line.startsWith("//")) continue;
     try {
@@ -275,7 +291,7 @@ export function dedupe(nodes) {
 
 export function extractLinks(text) {
   const links = [];
-  for (const rawLine of String(text).split(/\r?\n/)) {
+  for (const rawLine of splitLines(text)) {
     const line = stripZeroWidth(rawLine.trim());
     if (SCHEMES.some((scheme) => line.startsWith(scheme))) links.push(line);
   }
@@ -293,7 +309,7 @@ function decodeB64Blob(text) {
 
 function decodeB64PerLine(text) {
   const out = [];
-  for (const rawLine of String(text).split(/\r?\n/)) {
+  for (const rawLine of splitLines(text)) {
     const line = stripZeroWidth(rawLine.trim());
     if (!line || line.startsWith("#")) continue;
     try {
@@ -303,6 +319,15 @@ function decodeB64PerLine(text) {
     }
   }
   return out.join("\n");
+}
+
+/** Every non-comment line is an http(s) address - a subscription index, not a config body. */
+function isUrlList(text) {
+  const lines = splitLines(text)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith("#"));
+  if (!lines.length) return false;
+  return lines.every((line) => /^https?:\/\//i.test(line));
 }
 
 /** Decode any known subscription payload shape into plain link lines. */
@@ -327,6 +352,13 @@ export function decodeSubscription(text) {
   }
   if (best.length) return best.join("\n");
   const preview = input.trim().slice(0, 150).replace(/\s+/g, " ");
+  if (isUrlList(input)) {
+    throw new Error(
+      "That is a list of web addresses, not a subscription: these look like subscription URLs " +
+        "(or a page), and there is no config in them. Paste the subscription body, or use the " +
+        "\"Subscription URL\" tab.",
+    );
+  }
   throw new Error(
     "No vmess/vless/trojan/ss links found. This does not look like a V2Ray subscription. " +
       `First 150 characters: ${JSON.stringify(preview)}`,

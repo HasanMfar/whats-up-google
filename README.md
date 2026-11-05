@@ -70,7 +70,7 @@ from Google (the very network this tool exists for). Everything a browser *can* 
 | parse vmess / vless / trojan / ss and every transport + security field | send the four Google probes |
 | dedupe, search, sort, filter, inspect any node | run the Xray core |
 | read a `reports/scan-*.json` from an earlier CLI run | fetch subscription URLs (CORS blocks them) |
-| pick and download the four tiers — byte-identical to the CLI | |
+| pick the four tiers and download them as plain link lists (one clean config per line) | |
 
 ### Why Xray cannot run in the page
 

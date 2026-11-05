@@ -124,7 +124,7 @@ export const STRINGS = {
 
     "export.title": "3 · Take away a subscription",
     "export.hint":
-      "Picked from the results above, encoded exactly like the CLI writes them. Import the base64 file directly into v2rayN.",
+      "Picked from the results above as plain links: one clean config per line, no encoding step. Import the file as a link list, or paste its lines straight into your client.",
     "export.tier.best.name": "Best",
     "export.tier.best.desc": "Fastest config per working exit IP, for Gemini and Antigravity. Start here.",
     "export.tier.clean.name": "Clean",
@@ -133,14 +133,13 @@ export const STRINGS = {
     "export.tier.gemini.desc": "Works for Gemini web and API, even if Search shows a captcha.",
     "export.tier.antigravity.name": "Antigravity",
     "export.tier.antigravity.desc": "Works for Antigravity.",
-    "export.download": "Download subscription",
-    "export.download_links": "Links",
-    "export.copy": "Copy base64",
+    "export.download": "Download links",
+    "export.copy": "Copy links",
     "export.none": "Nothing qualified",
     "export.need_scan": "Probe or import a report to pick configs.",
     "export.config": "{n} config",
     "export.configs": "{n} configs",
-    "export.copied": "Copied",
+    "export.copied": "Links copied",
 
     "about.title": "How this works",
     "about.lede":
@@ -294,7 +293,7 @@ export const STRINGS = {
 
     "export.title": "۳ · اشتراک آماده را بردار",
     "export.hint":
-      "از نتیجه‌های بالا انتخاب می‌شود و دقیقاً مثل خروجی CLI کدگذاری می‌شود. فایل بیس‌۶۴ را مستقیم در v2rayN ایمپورت کن.",
+      "از نتیجه‌های بالا به‌صورت لینک ساده انتخاب می‌شود: هر کانفیگ تمیز در یک خط، بدون مرحلهٔ کدگذاری. فایل را به‌عنوان فهرست لینک ایمپورت کن، یا خطوطش را مستقیم در کلاینت بچسبان.",
     "export.tier.best.name": "بهترین",
     "export.tier.best.desc": "سریع‌ترین کانفیگ برای هر IP خروجی سالم، برای جمینای و آنتی‌گرَویتی. از این‌جا شروع کن.",
     "export.tier.clean.name": "تمیز",
@@ -303,14 +302,13 @@ export const STRINGS = {
     "export.tier.gemini.desc": "برای وب و API جمینای کار می‌کند، حتی اگر جست‌وجو کپچا بدهد.",
     "export.tier.antigravity.name": "آنتی‌گرَویتی",
     "export.tier.antigravity.desc": "برای آنتی‌گرَویتی کار می‌کند.",
-    "export.download": "دانلود اشتراک",
-    "export.download_links": "لینک‌ها",
-    "export.copy": "کپی بیس‌۶۴",
+    "export.download": "دانلود لینک‌ها",
+    "export.copy": "کپی لینک‌ها",
     "export.none": "چیزی واجد شرایط نبود",
     "export.need_scan": "برای انتخاب کانفیگ‌ها بررسی کن یا گزارش وارد کن.",
     "export.config": "{n} کانفیگ",
     "export.configs": "{n} کانفیگ",
-    "export.copied": "کپی شد",
+    "export.copied": "لینک‌ها کپی شد",
 
     "about.title": "چطور کار می‌کند",
     "about.lede":

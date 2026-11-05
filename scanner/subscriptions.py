@@ -45,6 +45,12 @@ def _looks_like_links(text: str) -> bool:
     return bool(extract_links(text))
 
 
+def _looks_like_url_list(text: str) -> bool:
+    """Every non-comment line is an http(s) address - a subscription index, not a config body."""
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip() and not ln.strip().startswith("#")]
+    return bool(lines) and all(ln.lower().startswith(("http://", "https://")) for ln in lines)
+
+
 def b64_decode_tolerant(text: str) -> str:
     data = "".join(text.split()).replace("-", "+").replace("_", "/")
     data += "=" * (-len(data) % 4)
@@ -105,6 +111,14 @@ def decode_subscription(text: str, source: str = "") -> str:
             best = links
     if best:
         return "\n".join(best)
+
+    if _looks_like_url_list(text):
+        raise ValueError(
+            "that is a list of web addresses, not a subscription: these look like subscription "
+            "URLs (or a page) and contain no config - put them in subscriptions.txt, or paste the "
+            "subscription body itself"
+            + (f" [{source}]" if source else "")
+        )
 
     preview = text.strip()[:150].replace("\n", " ")
     raise ValueError(

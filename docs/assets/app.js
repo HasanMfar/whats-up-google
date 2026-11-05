@@ -465,9 +465,6 @@ function renderTiers() {
             <button class="btn btn--solid" data-download="${tier.key}" ${tier.count ? "" : "disabled"}>
               ${escapeHtml(t("export.download"))}
             </button>
-            <button class="btn btn--quiet" data-links="${tier.key}" ${tier.count ? "" : "disabled"} title="${escapeHtml(t("export.download_links"))}">
-              ${escapeHtml(t("export.download_links"))}
-            </button>
             <button class="btn btn--quiet" data-copy="${tier.key}" ${tier.count ? "" : "disabled"} title="${escapeHtml(t("export.copy"))}">
               ${escapeHtml(t("export.copy"))}
             </button>
@@ -1012,16 +1009,15 @@ function wireEvents() {
     const button = event.target.closest("button");
     if (!button) return;
     const tiers = buildTiers(state.rows);
-    const key = button.dataset.download || button.dataset.links || button.dataset.copy;
+    const key = button.dataset.download || button.dataset.copy;
     const tier = tiers.find((entry) => entry.key === key);
     if (!tier || !tier.count) return;
+    const block = `${tier.links.join("\n")}\n`;
 
     if (button.dataset.download) {
-      download(`${key}_subscription.txt`, tier.base64);
-    } else if (button.dataset.links) {
-      download(`${key}_links.txt`, `${tier.links.join("\n")}\n`);
+      download(`${key}_links.txt`, block);
     } else if (button.dataset.copy) {
-      toast((await copyText(tier.base64)) ? t("export.copied") : "Copy failed", false);
+      toast((await copyText(block.trimEnd())) ? t("export.copied") : "Copy failed", false);
     }
   });
 }
