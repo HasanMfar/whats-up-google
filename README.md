@@ -6,9 +6,9 @@
 
 > 🇮🇷 Full Persian docs: [README.fa.md](README.fa.md)
 
-Checks your V2Ray subscription **config by config** and picks out the clean ones: for
-each node it sends real requests through that node and sees whether Google lets it
-through to Google Search, Gemini (web), the Gemini API and Antigravity - or flags/blocks it.
+Scans V2Ray subscriptions **config by config**, checking Google Search, Gemini (web),
+the Gemini API, and Antigravity through each node's own tunnel. It identifies which
+services each config can reach and exports passing configs as importable tiers.
 
 ## About this project
 
@@ -18,7 +18,7 @@ some hit the Gemini API "location not supported" error, some are fine. The
 subscription as a whole is therefore never uniformly usable - but individual
 configs among them are.
 
-This tool answers exactly two questions:
+The local scanner and browser workbench answer exactly two questions:
 
 1. **Which of my configs does Google let through, and to which services?** - every
    config is tested through its own tunnel, with its ID recorded, so results are
@@ -34,7 +34,7 @@ evidence behind every verdict.
 
 ## Quick start (Windows)
 
-1. Double-click **`run.bat`**.
+1. Install Python 3.10 or later, then double-click **`run.bat`**.
    - First time only: it installs the Python packages and downloads the Xray core.
    - `subscriptions.txt` opens in Notepad - paste your subscription URLs (one per
      line), save, close. A **start menu** appears - press Enter for a full scan,
@@ -87,7 +87,7 @@ python whats-up-google-bridge.pyz --serve
 
 Or click **Download the bridge** on the page and run the command it shows. The `.pyz` carries the
 scanner's own modules *and* its dependencies (httpx, socksio, rich), so there is no `git`, no
-`pip`, and no virtualenv — Python 3.9+ is the only requirement, and the Xray core downloads itself
+`pip`, and no virtualenv — Python 3.10+ is the only requirement, and the Xray core downloads itself
 on the first scan. It prints the workbench URL with the token already attached; `--open` opens it
 for you.
 
@@ -116,6 +116,7 @@ python -m scanner                  # full scan
 python -m scanner --dry-run        # just list parsed configs + IDs
 python -m scanner --concurrency 40 # test 40 nodes in parallel (default 20)
 python -m scanner --skip search    # drop a check: search/gemini/gemini_api/antigravity
+python -m scanner --check-xray     # download/check the Xray core, then exit
 python -m scanner --watch 30       # re-scan every 30 minutes
 python -m scanner --file links.txt # local file of links instead of subscriptions.txt
 python -m scanner --no-menu        # skip the interactive start menu (scripted use)
@@ -131,7 +132,7 @@ python -m scanner --serve --open   # ...and open it in the browser
 
 - The tool **prints every file it wrote** - JSON/CSV/HTML reports plus each hand-picked
   subscription tier - with its path and size.
-- **Interactive HTML Report:** Every scan now generates a self-contained, searchable, and sortable HTML report in `reports/` with a summary dashboard and color-coded status indicators.
+- **HTML report:** Every scan generates an HTML report in `reports/` with a summary dashboard and color-coded status indicators. Its styling uses a CDN stylesheet.
 - Subscription payloads are decoded **tolerantly**: header lines, BOMs, unsupported
   schemes mixed in, whole-body or per-line base64 (url-safe, unpadded, even
   double-encoded) and percent-encoded bodies all work - unsupported lines are
