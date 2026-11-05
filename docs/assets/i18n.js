@@ -64,7 +64,7 @@ export const STRINGS = {
     "bridge.get.copy": "Copy command",
     "bridge.get.copied": "Command copied",
     "bridge.get.why":
-      "A single .pyz with everything inside: no git, no pip, no virtualenv. Python 3.9+ is the only requirement, and the Xray core downloads itself on the first scan.",
+      "A single .pyz with everything inside: no git, no pip, no virtualenv. Python 3.10+ is the only requirement, and the Xray core downloads itself on the first scan.",
     "bridge.get.cli": "From a source checkout: python -m scanner --serve",
 
     "probe.title": "2 · Probe the configs",
